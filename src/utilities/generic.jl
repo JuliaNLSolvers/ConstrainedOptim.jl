@@ -5,7 +5,7 @@ macro def(name, definition)
       end
     end)
   end
-  
+
   # TODO decide if this is wanted and/or necessary
 @def add_generic_fields begin
     n::Int64
@@ -27,7 +27,7 @@ end
 @def initial_linesearch begin
     (similar(initial_x), # Buffer of x for line search in state.x_ls
     similar(initial_x), # Buffer of g for line search in state.g_ls
-    LineSearches.alphainit(one(T), initial_x, g, f_x), # Keep track of step size in state.alpha
+    one(T), # Keep track of step size in state.alpha
     false, # state.mayterminate
     LineSearches.LineSearchResults(T))
 end
