@@ -239,11 +239,11 @@ function update_state!(d, constraints::TwiceDifferentiableConstraints, state::IP
     # (See Waechter & Biegler 2006, eq. 16)
     μ = state.μ
     for i = 1:length(bstate.slack_x)
-        p = μ/bstate.slack_x[i]
+        p = μ / bstate.slack_x[i]
         bstate.λx[i] = max(min(bstate.λx[i], 10^10*p), p/10^10)
     end
     for i = 1:length(bstate.slack_c)
-        p = μ/bstate.slack_c[i]
+        p = μ / bstate.slack_c[i]
         bstate.λc[i] = max(min(bstate.λc[i], 10^10*p), p/10^10)
     end
     state.μ = state.μnext

@@ -329,8 +329,8 @@ function initialize_μ_λ!(state, bounds::ConstraintBounds, Hinfo, μ0::Union{Sy
     end
     state.μ = μ
     # Set λI
-    state.bstate.λx[:] = μ./state.bstate.slack_x
-    state.bstate.λc[:] = μ./state.bstate.slack_c
+    @. state.bstate.λx = μ / state.bstate.slack_x
+    @. state.bstate.λc = μ / state.bstate.slack_c
     # Calculate λE
     λI = lambdaI(state)
     ∇bI = gf - JI'*λI
@@ -688,9 +688,9 @@ function equality_grad_var!(gs, gx, ineq, σ, λ)
 end
 
 function equality_grad_var!(gs, gx, ineq, σ, λ, J)
-    gs[:] = gs + λ
+    @. gs = gs + λ
     if !isempty(ineq)
-        gx[:] = gx - view(J, ineq, :)'*(λ.*σ)
+        gx .= gx .- view(J, ineq, :)'*(λ.*σ)
     end
     nothing
 end
@@ -705,7 +705,7 @@ end
 # violations of v = target
 function equality_grad_var!(gx, idx, λ, J)
     if !isempty(idx)
-        gx[:] = gx - view(J, idx, :)'*λ
+        gx .= gx .- view(J, idx, :)'*λ
     end
     nothing
 end
