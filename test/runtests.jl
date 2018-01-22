@@ -1,5 +1,18 @@
-using IPNewton
-using Base.Test
+#
+# Correctness Tests
+#
 
-# write your own tests here
-@test 1 == 2
+using IPNewtons
+using Base.Test
+using Compat
+
+my_tests = [
+     "constraints.jl",
+    ]#"constrained.jl"]
+
+println("Running tests:")
+
+for my_test in my_tests
+    println(" * $(my_test)")
+    include(my_test)
+end
