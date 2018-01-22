@@ -4,6 +4,8 @@
     prob = UP.examples["Rosenbrock"]
     df = TwiceDifferentiable(UP.objective(prob), UP.gradient(prob),
                              UP.objective_gradient(prob), UP.hessian(prob), prob.initial_x)
+
+    infvec = fill(Inf, size(prob.initial_x))
     constraints = TwiceDifferentiableConstraints(-infvec, infvec)
 
     options = OptimizationOptions(iterations = 1000, show_trace = true)
