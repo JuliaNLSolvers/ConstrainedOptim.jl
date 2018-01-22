@@ -4,6 +4,7 @@ module IPNewtons
     using PositiveFactorizations
     using ForwardDiff
     using LineSearches
+    using NaNMath
 
     import NLSolversBase: iscomplex, OnceDifferentiable, TwiceDifferentiable, AbstractObjective, hessian, hessian!
     import Base.length,

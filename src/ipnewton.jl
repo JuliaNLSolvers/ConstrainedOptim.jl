@@ -295,7 +295,7 @@ function solve_step!(state::IPNewtonState, constraints, options)
             dot(bstate.slack_c + αs*bstep.slack_c, bstate.λc + αλ*bstep.λc))/m
     μmean = (dot(bstate.slack_x, bstate.λx) + dot(bstate.slack_c, bstate.λc))/m
     # When there's only one constraint, μaff can be exactly zero. So limit the decrease.
-    state.μnext = max((μaff/μmean)^3 * μmean, μmean/10)
+    state.μnext = NaNMath.max((μaff/μmean)^3 * μmean, μmean/10)
     μ = state.μ
     # Solve for the *real* step (including μ)
     μsinv = μ * [bounds.σx./bstate.slack_x; bounds.σc./bstate.slack_c]

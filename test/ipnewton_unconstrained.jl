@@ -8,9 +8,9 @@
     infvec = fill(Inf, size(prob.initial_x))
     constraints = TwiceDifferentiableConstraints(-infvec, infvec)
 
-    options = OptimizationOptions(iterations = 1000, show_trace = true)
+    options = OptimizationOptions(iterations = 1000, show_trace = false)
 
-    results = optimize(df,constraints,prob.initial_x, method, options)
+    results = optimize(df,constraints,prob.initial_x, IPNewton(), options)
     @test isa(summary(results), String)
     @test IPNewtons.converged(results)
     @test IPNewtons.minimum(results) < prob.minimum + sqrt(eps(typeof(prob.minimum)))
