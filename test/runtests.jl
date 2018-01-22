@@ -12,7 +12,7 @@ debug_printing = true
 
 my_tests = [
     "ipnewton_unconstrained.jl",
-    #"constraints.jl",
+    "constraints.jl",
 ]#"constrained.jl"]
 
 
