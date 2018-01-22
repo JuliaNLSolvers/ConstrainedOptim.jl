@@ -256,8 +256,6 @@ end
 # Fallbacks (for methods that don't need these)
 after_while!(d, constraints::AbstractConstraints, state, method, options) = nothing
 update_h!(d, constraints::AbstractConstraints, state, method) = nothing
-update_asneeded_fg!(d, constraints, state, method) = update_fg!(d, constraints, state, method)
-update_asneeded_fg!(d, constraints, state, method::IPOptimizer{typeof(backtrack_constrained)}) = update_g!(d, constraints, state, method)
 
 """
     initialize_μ_λ!(state, bounds, μ0=:auto, β=0.01)
