@@ -146,9 +146,9 @@ function optimize{T, M <: Union{FirstOrderSolver, SecondOrderSolver}}(f::Functio
             error("No gradient or Hessian was provided. Either provide a gradient and Hessian, set autodiff = true in the OptimizationOptions if applicable, or choose a solver that doesn't require a Hessian.")
         end
     else
-        g!(x, out) = ForwardDiff.gradient!(out, f, x)
+        g!(out, x) = ForwardDiff.gradient!(out, f, x)
 
-        function fg!(x, out)
+        function fg!(out, x)
             gr_res = ForwardDiff.GradientResult(zero(T),out)
             ForwardDiff.gradient!(gr_res, f, x)
             ForwardDiff.value(gr_res)
@@ -157,7 +157,7 @@ function optimize{T, M <: Union{FirstOrderSolver, SecondOrderSolver}}(f::Functio
         if M <: FirstOrderSolver
             d = OnceDifferentiable(f, g!, fg!)
         else
-            h! = (x, out) -> ForwardDiff.hessian!(out, f, x)
+            h! = (out, x) -> ForwardDiff.hessian!(out, f, x)
             d = TwiceOnceDifferentiable(f, g!, fg!, h!)
         end
     end
@@ -172,9 +172,9 @@ function optimize(d::OnceDifferentiable,
     if !options.autodiff
         error("No Hessian was provided. Either provide a Hessian, set autodiff = true in the OptimizationOptions if applicable, or choose a solver that doesn't require a Hessian.")
     else
-        h! = (x, out) -> ForwardDiff.hessian!(out, d.f, x)
+        h! = (out, x) -> ForwardDiff.hessian!(out, d.f, x)
     end
-    optimize(TwiceOnceDifferentiable(d.f, d.g!, d.fg!, h!), initial_x, method, options)
+    optimize(TwiceOnceDifferentiable(d.f, d.df, d.fdf, h!), initial_x, method, options)
 end
 
 function optimize(d::OnceDifferentiable,
@@ -184,7 +184,7 @@ function optimize(d::OnceDifferentiable,
     if !options.autodiff
         error("No Hessian was provided. Either provide a Hessian, set autodiff = true in the OptimizationOptions if applicable, or choose a solver that doesn't require a Hessian.")
     else
-        h! = (x, out) -> ForwardDiff.hessian!(out, d.f, x)
+        h! = (out, x) -> ForwardDiff.hessian!(out, d.f, x)
     end
     optimize(TwiceOnceDifferentiable(d.f, d.df, d.df, h!), initial_x, method, options)
 end

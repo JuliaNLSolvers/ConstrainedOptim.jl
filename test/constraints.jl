@@ -57,7 +57,7 @@ using IPNewtons, PositiveFactorizations
             pcmp = similar(p)
             ftot = p->IPNewtons.lagrangian_vec(p, d, bounds, xd, cfun, bstated, μ)
             #ForwardDiff.gradient!(pcmp, ftot, p, ForwardDiff.{chunksize}())
-            ForwardDiff.gradient!(pcmp, ftot, p, GradientConfig)
+            ForwardDiff.gradient!(pcmp, ftot, p)
             @test pcmp ≈ pgrad
         end
         # Basic setup (using two objectives, one equal to zero and the other a Gaussian)

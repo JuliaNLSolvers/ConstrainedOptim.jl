@@ -440,7 +440,7 @@ end
 
 function lagrangian_g!(gx, bgrad, d, bounds::ConstraintBounds, x, c, J, bstate::BarrierStateVars, μ)
     fill!(bgrad, 0)
-    d.g!(x, gx)
+    d.df(gx,x)
     barrier_grad!(gx, bgrad, bounds, x, bstate, μ)
     equality_grad!(gx, bgrad, bounds, x, c, J, bstate)
     nothing
