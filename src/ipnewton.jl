@@ -81,7 +81,6 @@ function initial_state(method::IPNewton, options, d::TwiceDifferentiable, constr
     n = length(initial_x)
     g = Vector{T}(n)
     s = Vector{T}(n)
-    x_ls, g_ls = Vector{T}(n), Vector{T}(n)
     f_x_previous, f_x = NaN, d.fdf(g, initial_x)
     f_calls, g_calls = 1, 1
     H = Matrix{T}(n, n)

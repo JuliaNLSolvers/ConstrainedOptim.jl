@@ -1,18 +1,18 @@
 module ConstrainedProblems
 
-using ..OptimizationProblem, ...TwiceDifferentiableConstraints
+#using ..OptimizationProblem, ...TwiceDifferentiableConstraints
 
-examples = Dict{AbstractString, OptimizationProblem}()
+#examples = Dict{AbstractString, OptimizationProblem}()
 
 hs9_obj(x::AbstractVector) = sin(π*x[1]/12) * cos(π*x[2]/16)
-hs9_c!(x::AbstractVector, c::AbstractVector) = (c[1] = 4*x[1]-3*x[2]; c)
+hs9_c!(c::AbstractVector, x::AbstractVector) = (c[1] = 4*x[1]-3*x[2]; c)
 
-function hs9_obj_g!(x::AbstractVector, g::AbstractVector)
+function hs9_obj_g!(g::AbstractVector, x::AbstractVector)
     g[1] = π/12 * cos(π*x[1]/12) * cos(π*x[2]/16)
     g[2] = -π/16 * sin(π*x[1]/12) * sin(π*x[2]/16)
     g
 end
-function hs9_obj_h!(x::AbstractVector, h::AbstractMatrix)
+function hs9_obj_h!(h::AbstractMatrix, x::AbstractVector)
     v = hs9_obj(x)
     h[1,1] = -π^2*v/144
     h[2,2] = -π^2*v/256
@@ -20,23 +20,25 @@ function hs9_obj_h!(x::AbstractVector, h::AbstractMatrix)
     h
 end
 
-function hs9_jacobian!(x, J)
+function hs9_jacobian!(J, x)
     J[1,1] = 4
     J[1,2] = -3
     J
 end
-hs9_h!(x, λ, h) = h
+hs9_h!(h, x, λ) = h
+x0 = [0.0, 0.0]
 
-examples["HS9"] = OptimizationProblem("HS9",
-                                      hs9_obj,
-                                      hs9_obj_g!,
-                                      hs9_obj_h!,
-                                      TwiceDifferentiableConstraintsFunction(
-                                          hs9_c!, hs9_jacobian!, hs9_h!,
-                                          [], [], [0.0], [0.0]),
-                                      [0.0, 0.0],
-                                      [[12k-3, 16k-4] for k in (0, 1, -1)], # any integer k will do...
-                                      true,
-                                      true)
+# examples["HS9"] = ConstrainedOptimizationProblem("HS9",
+#                                                  hs9_obj,
+#                                                  hs9_obj_g!,
+#                                                  nothing,
+#                                                  hs9_obj_h!,
+#                                                  TwiceDifferentiableConstraints(
+#                                                      hs9_c!, hs9_jacobian!, hs9_h!,
+#                                                      [], [], [0.0], [0.0]),
+#                                                  [0.0, 0.0],
+#                                                  [[12k-3, 16k-4] for k in (0, 1, -1)], # any integer k will do...
+#                                                  true,
+#                                                  true)
 
 end  # module

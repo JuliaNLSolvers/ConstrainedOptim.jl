@@ -471,6 +471,30 @@ using IPNewtons, PositiveFactorizations
             @test state.bstate.slack_c[1] < eps(float(σ))
         end
     end
+
+@testset "Constrained optimization" begin
+    CP = IPNewtons.ConstrainedProblems
+    df = TwiceDifferentiable(CP.hs9_obj,CP.hs9_obj_g!,CP.hs9_obj_h!,CP.x0)
+    constraints = TwiceDifferentiableConstraints(
+        CP.hs9_c!, CP.hs9_jacobian!, CP.hs9_h!,
+        [], [], [0.0], [0.0])
+
+    options = OptimizationOptions(iterations = 1000, show_trace = false)
+
+    xsol = [-3.,-4]
+    minval = NLSolversBase.value(df, xsol)
+
+    results = optimize(df,constraints, [-1, 2.], IPNewton(), options)
+    @test isa(summary(results), String)
+    @test IPNewtons.converged(results)
+    @test IPNewtons.minimum(results) < minval + sqrt(eps(minval))
+
+    # TODO: The algorithm gets stuck when using x0 = [0,0]
+    #       Check with Tim if this also happened before?
+    # results = optimize(df,constraints, CP.x0, IPNewton(), options) #x0 = [0,0]
+    # @test IPNewtons.converged(results)
+    # @test IPNewtons.minimum(results) < minval + sqrt(eps(minval))
+end
 end
 
 nothing

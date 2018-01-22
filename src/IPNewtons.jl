@@ -3,7 +3,7 @@ __precompile__(true)
 module IPNewtons
     using PositiveFactorizations
     using ForwardDiff
-    using LineSearches
+    using NLSolversBase, LineSearches
     using NaNMath
 
     import NLSolversBase: iscomplex, OnceDifferentiable, TwiceDifferentiable, AbstractObjective, hessian, hessian!
@@ -57,6 +57,6 @@ module IPNewtons
     include("utilities/trace.jl")
 
     # Examples for testing
-#    include(joinpath("problems", "multivariate.jl"))
+    include(joinpath("problems", "constrained.jl"))
 #    using .MultivariateProblems
 end
