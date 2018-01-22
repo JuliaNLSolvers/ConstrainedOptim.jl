@@ -838,7 +838,7 @@ function unpack_vec!(x, b::BarrierStateVars, vec::Vector)
 end
 function unpack_vec!(x, vec::Vector, k::Int)
     for i = 1:length(x)
-        x[i] = ForwardDiff.value(vec[k+=1])
+        x[i] = vec[k+=1]
     end
     k
 end
