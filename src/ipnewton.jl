@@ -71,7 +71,7 @@ function initial_state(method::IPNewton, options, d::TwiceDifferentiable, constr
     # Check feasibility of the initial state
     mc = nconstraints(constraints)
     constr_c = Array{T}(mc)
-    constraints.c!(initial_x, constr_c)
+    constraints.c!(constr_c, initial_x)
     if !isinterior(constraints, initial_x, constr_c)
         warn("initial guess is not an interior point")
         Base.show_backtrace(STDERR, backtrace())
@@ -81,7 +81,6 @@ function initial_state(method::IPNewton, options, d::TwiceDifferentiable, constr
     n = length(initial_x)
     g = Vector{T}(n)
     s = Vector{T}(n)
-    x_ls, g_ls = Vector{T}(n), Vector{T}(n)
     f_x_previous, f_x = NaN, d.fdf(g, initial_x)
     f_calls, g_calls = 1, 1
     H = Matrix{T}(n, n)
@@ -94,7 +93,7 @@ function initial_state(method::IPNewton, options, d::TwiceDifferentiable, constr
     constr_J = Array{T}(mc, n)
     constr_gtemp = Array{T}(n)
     gtilde = similar(g)
-    constraints.jacobian!(initial_x, constr_J)
+    constraints.jacobian!(constr_J, initial_x)
     μ = T(1)
     bstate = BarrierStateVars(constraints.bounds, initial_x, constr_c)
     bgrad = similar(bstate)
@@ -183,7 +182,7 @@ function update_h!(d, constraints::TwiceDifferentiableConstraints, state, method
     # accumulate the constraint second derivatives
     λ = userλ(bstate.λc, constraints)
     λ[bounds.eqc] = -bstate.λcE  # the negative sign is from the Hessian
-    constraints.h!(x, λ, Hxx)
+    constraints.h!(Hxx, x, λ)
     # Add the Jacobian terms (JI'*Hss*JI)
     JIc = view(J, bounds.ineqc, :)
     Hssc = Diagonal(bstate.λc./bstate.slack_c)
@@ -239,18 +238,18 @@ function update_state!(d, constraints::TwiceDifferentiableConstraints, state::IP
     # (See Waechter & Biegler 2006, eq. 16)
     μ = state.μ
     for i = 1:length(bstate.slack_x)
-        p = μ/bstate.slack_x[i]
+        p = μ / bstate.slack_x[i]
         bstate.λx[i] = max(min(bstate.λx[i], 10^10*p), p/10^10)
     end
     for i = 1:length(bstate.slack_c)
-        p = μ/bstate.slack_c[i]
+        p = μ / bstate.slack_c[i]
         bstate.λc[i] = max(min(bstate.λc[i], 10^10*p), p/10^10)
     end
     state.μ = state.μnext
 
     # Evaluate the constraints at the new position
-    constraints.c!(state.x, state.constr_c)
-    constraints.jacobian!(state.x, state.constr_J)
+    constraints.c!(state.constr_c, state.x)
+    constraints.jacobian!(state.constr_J, state.x)
     state.ev == equality_violation(constraints, state)
 
     false
@@ -295,7 +294,7 @@ function solve_step!(state::IPNewtonState, constraints, options)
             dot(bstate.slack_c + αs*bstep.slack_c, bstate.λc + αλ*bstep.λc))/m
     μmean = (dot(bstate.slack_x, bstate.λx) + dot(bstate.slack_c, bstate.λc))/m
     # When there's only one constraint, μaff can be exactly zero. So limit the decrease.
-    state.μnext = max((μaff/μmean)^3 * μmean, μmean/10)
+    state.μnext = NaNMath.max((μaff/μmean)^3 * μmean, μmean/10)
     μ = state.μ
     # Solve for the *real* step (including μ)
     μsinv = μ * [bounds.σx./bstate.slack_x; bounds.σc./bstate.slack_c]
