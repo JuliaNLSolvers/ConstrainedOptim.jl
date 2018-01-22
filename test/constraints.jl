@@ -22,13 +22,7 @@ using IPNewtons, PositiveFactorizations
         @test b.bc == [3.8,4.0]
         io = IOBuffer()
         show(io, b)
-        @test String(take!(io)) == """
-ConstraintBounds:\n  Variables:
-    x[3]=2.0
-    x[1]≥0.0, x[1]≤1.0, x[2]≥0.5, x[2]≤1.0
-  Linear/nonlinear constraints:
-    c_1=5.0
-    c_2≥3.8, c_2≤4.0"""
+        @test String(take!(io)) == "ConstraintBounds:\n  Variables:\n    x[3]=2.0\n    x[1]≥0.0, x[1]≤1.0, x[2]≥0.5, x[2]≤1.0\n  Linear/nonlinear constraints:\n    c_1=5.0\n    c_2≥3.8, c_2≤4.0"
 
         b = IPNewtons.ConstraintBounds(Float64[], Float64[], [5.0, 3.8], [5.0, 4.0])
         for fn in (:eqx, :valx, :ineqx, :σx, :bx)
@@ -57,12 +51,13 @@ ConstraintBounds:\n  Variables:
             pgrad = similar(p)
             ftot!(pgrad, p)
             chunksize = min(8, length(p))
-            TD = ForwardDiff.Dual{chunksize,eltype(p)}
-            xd = Array{TD}(length(x))
+            TD = ForwardDiff.Dual{Void,eltype(p),chunksize}
+            xd = similar(x, TD)
             bstated = IPNewtons.BarrierStateVars{TD}(bounds)
             pcmp = similar(p)
             ftot = p->IPNewtons.lagrangian_vec(p, d, bounds, xd, cfun, bstated, μ)
-            ForwardDiff.gradient!(pcmp, ftot, p, ForwardDiff.Chunk{chunksize}())
+            #ForwardDiff.gradient!(pcmp, ftot, p, ForwardDiff.{chunksize}())
+            ForwardDiff.gradient!(pcmp, ftot, p, GradientConfig)
             @test pcmp ≈ pgrad
         end
         # Basic setup (using two objectives, one equal to zero and the other a Gaussian)
@@ -313,7 +308,8 @@ ConstraintBounds:\n  Variables:
         ## An objective function with a nonzero hessian
         hd = [1.0, 100.0, 0.01, 2.0]   # diagonal terms of hessian
         d = TwiceDifferentiable(x->sum(hd.*x.^2)/2, (g,x)->copy!(g, hd.*x), (h,x)->copy!(h, Diagonal(hd)), x)
-        gx = d.g!(zeros(4), x)
+        NLSolversBase.gradient!(d, x)
+        gx = NLSolversbase.gradient(d)
         hx = Diagonal(hd)
         # Variable bounds
         constraints = TwiceDifferentiableConstraints([0.5, 0.0, -Inf, -Inf], [Inf, Inf, 1.0, 0.8])

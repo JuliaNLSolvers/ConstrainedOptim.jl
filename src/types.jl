@@ -253,7 +253,7 @@ function Base.show(io::IO, cb::ConstraintBounds)
     nothing
 end
 
-abstract AbstractConstraints
+abstract type AbstractConstraints end
 
 nconstraints(constraints::AbstractConstraints) = nconstraints(constraints.bounds)
 
@@ -267,6 +267,8 @@ function DifferentiableConstraintsFunction(c!, jacobian!, lx, ux, lc, uc)
     b = ConstraintBounds(lx, ux, lc, uc)
     DifferentiableConstraintsFunction(c!, jacobian!, b)
 end
+
+#TODO: is this constructor necessary?
 DifferentiableConstraintsFunction(c!, jacobian!, bounds::ConstraintBounds) =
     DifferentiableConstraintsFunction{typeof(c!), typeof(jacobian!), eltype(b)}(c!, jacobian!, b)
 
