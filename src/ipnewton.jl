@@ -71,7 +71,7 @@ function initial_state(method::IPNewton, options, d::TwiceDifferentiable, constr
     # Check feasibility of the initial state
     mc = nconstraints(constraints)
     constr_c = Array{T}(mc)
-    constraints.c!(initial_x, constr_c)
+    constraints.c!(constr_c, initial_x)
     if !isinterior(constraints, initial_x, constr_c)
         warn("initial guess is not an interior point")
         Base.show_backtrace(STDERR, backtrace())
@@ -94,7 +94,7 @@ function initial_state(method::IPNewton, options, d::TwiceDifferentiable, constr
     constr_J = Array{T}(mc, n)
     constr_gtemp = Array{T}(n)
     gtilde = similar(g)
-    constraints.jacobian!(initial_x, constr_J)
+    constraints.jacobian!(constr_J, initial_x)
     μ = T(1)
     bstate = BarrierStateVars(constraints.bounds, initial_x, constr_c)
     bgrad = similar(bstate)
@@ -183,7 +183,7 @@ function update_h!(d, constraints::TwiceDifferentiableConstraints, state, method
     # accumulate the constraint second derivatives
     λ = userλ(bstate.λc, constraints)
     λ[bounds.eqc] = -bstate.λcE  # the negative sign is from the Hessian
-    constraints.h!(x, λ, Hxx)
+    constraints.h!(Hxx, x, λ)
     # Add the Jacobian terms (JI'*Hss*JI)
     JIc = view(J, bounds.ineqc, :)
     Hssc = Diagonal(bstate.λc./bstate.slack_c)
@@ -249,8 +249,8 @@ function update_state!(d, constraints::TwiceDifferentiableConstraints, state::IP
     state.μ = state.μnext
 
     # Evaluate the constraints at the new position
-    constraints.c!(state.x, state.constr_c)
-    constraints.jacobian!(state.x, state.constr_J)
+    constraints.c!(state.constr_c, state.x)
+    constraints.jacobian!(state.constr_J, state.x)
     state.ev == equality_violation(constraints, state)
 
     false

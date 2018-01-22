@@ -390,7 +390,7 @@ cE(state, bounds::ConstraintBounds) = [state.x[bounds.eqx]; state.constr_c[bound
 
 function hessianI!(h, x, constraints, λcI, μ)
     λ = userλ(λcI, constraints)
-    constraints.h!(x, λ, h)
+    constraints.h!(h, x, λ)
     h
 end
 
@@ -484,7 +484,7 @@ function _lagrangian_linefunc(αs, d, constraints, state)
     b_ls, bounds = state.b_ls, constraints.bounds
     ls_update!(state.x_ls, state.x, state.s, alphax(αs))
     ls_update!(b_ls.bstate, state.bstate, state.bstep, αs)
-    constraints.c!(state.x_ls, b_ls.c)
+    constraints.c!(b_ls.c, state.x_ls)
     lagrangian(d, constraints.bounds, state.x_ls, b_ls.c, b_ls.bstate, state.μ)
 end
 alphax(α::Number) = α
@@ -510,8 +510,8 @@ function _lagrangian_lineslope(αs, d, constraints, state)
     bstep, bgrad = state.bstep, b_ls.bgrad
     ls_update!(state.x_ls, state.x, state.s, alphax(αs))
     ls_update!(b_ls.bstate, state.bstate, bstep, αs)
-    constraints.c!(state.x_ls, b_ls.c)
-    constraints.jacobian!(state.x_ls, b_ls.J)
+    constraints.c!(b_ls.c, state.x_ls)
+    constraints.jacobian!(b_ls.J, state.x_ls)
     f_x, L, ev = lagrangian_fg!(state.g_ls, bgrad, d, bounds, state.x_ls, b_ls.c, b_ls.J, b_ls.bstate, state.μ)
     slopeα = slopealpha(state.s, state.g_ls, bstep, bgrad)
     f_x, L, ev, slopeα
@@ -530,22 +530,11 @@ slopealpha(sx, gx, bstep, bgrad) = dot(sx, gx) +
     dot(bstep.λx, bgrad.λx) + dot(bstep.λc, bgrad.λc) +
     dot(bstep.λxE, bgrad.λxE) + dot(bstep.λcE, bgrad.λcE)
 
-if VERSION >= v"0.5.0"
-    function linesearch_anon(d, constraints, state, method::IPOptimizer{typeof(backtrack_constrained_grad)})
-        αs->lagrangian_lineslope!(αs, d, constraints, state, method)
-    end
-    function linesearch_anon(d, constraints, state, method::IPOptimizer{typeof(backtrack_constrained)})
-        αs->lagrangian_linefunc!(αs, d, constraints, state, method)
-    end
-else
-    # 0.4 can't dispatch on a particular function
-    function linesearch_anon(d, constraints, state, method::IPOptimizer)
-        ls = method.linesearch!
-        if ls == backtrack_constrained_grad
-            return αs->lagrangian_lineslope!(αs, d, constraints, state, method)
-        end
-        αs->lagrangian_linefunc!(αs, d, constraints, state, method)
-    end
+function linesearch_anon(d, constraints, state, method::IPOptimizer{typeof(backtrack_constrained_grad)})
+    αs->lagrangian_lineslope!(αs, d, constraints, state, method)
+end
+function linesearch_anon(d, constraints, state, method::IPOptimizer{typeof(backtrack_constrained)})
+    αs->lagrangian_linefunc!(αs, d, constraints, state, method)
 end
 
 ## Computation of Lagrangian terms: barrier penalty
@@ -762,7 +751,7 @@ isfeasible(constraints, state::AbstractBarrierState) = isfeasible(constraints, s
 function isfeasible(constraints, x)
     # don't assume c! returns c (which means this is a little more awkward)
     c = Array{eltype(x)}(constraints.bounds.nc)
-    constraints.c!(x, c)
+    constraints.c!(c, x)
     isfeasible(constraints, x, c)
 end
 isfeasible(constraints::AbstractConstraints, x, c) = isfeasible(constraints.bounds, x, c)
@@ -797,7 +786,7 @@ end
 isinterior(constraints, state::AbstractBarrierState) = isinterior(constraints, state.x, state.constraints_c)
 function isinterior(constraints, x)
     c = Array{eltype(x)}(constraints.bounds.nc)
-    constraints.c!(x, c)
+    constraints.c!(c, x)
     isinterior(constraints, x, c)
 end
 isinterior(constraints::AbstractConstraints, x, c) = isinterior(constraints.bounds, x, c)

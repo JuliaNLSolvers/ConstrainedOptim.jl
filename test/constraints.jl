@@ -78,9 +78,10 @@ using IPNewtons, PositiveFactorizations
         ## result as the general case. So in the first three
         ## constrained cases below, we compare variable constraints
         ## against the same kind of constraint applied generically.
-        cvar! = (x, c) -> copy!(c, x)
-        cvarJ! = (x, J) -> copy!(J, eye(size(J)...))
-        cvarh! = (x, λ, h) -> h  # h! adds to h, it doesn't replace it
+        cvar! = (c, x) -> copy!(c, x)
+        cvarJ! = (J, x) -> copy!(J, eye(size(J)...))
+        cvarh! = (h, x, λ) -> h  # h! adds to h, it doesn't replace it
+
         ## No constraints
         bounds = IPNewtons.ConstraintBounds(Float64[], Float64[], Float64[], Float64[])
         bstate = IPNewtons.BarrierStateVars(bounds, x)
@@ -89,7 +90,7 @@ using IPNewtons, PositiveFactorizations
         @test f_x == L == dg.f(x)
         @test gx == H*x
         constraints = TwiceDifferentiableConstraints(
-            (x,c)->nothing, (x,J)->nothing, (x,λ,H)->nothing, bounds)
+            (c,x)->nothing, (J,x)->nothing, (H,x,λ)->nothing, bounds)
         state = IPNewtons.initial_state(method, options, dg, constraints, x)
         @test IPNewtons.gf(bounds, state) ≈ gx
         @test IPNewtons.Hf(constraints, state) ≈ H
@@ -112,7 +113,7 @@ using IPNewtons, PositiveFactorizations
 
 
         constraints = TwiceDifferentiableConstraints(
-            (x,c)->nothing, (x,J)->nothing, (x,λ,H)->nothing, bounds)
+            (c,x)->nothing, (J,x)->nothing, (H,x,λ)->nothing, bounds)
         state = IPNewtons.initial_state(method, options, d0, constraints, x)
         copy!(state.bstate.λxE, bstate.λxE)
         setstate!(state, μ, d0, constraints, method)
@@ -142,7 +143,7 @@ using IPNewtons, PositiveFactorizations
         # TODO: Fix autodiff check
         #check_autodiff(d0, bounds, y, cfun, bstate, μ)
         constraints = TwiceDifferentiableConstraints(
-            (x,c)->nothing, (x,J)->nothing, (x,λ,H)->nothing, bounds)
+            (c,x)->nothing, (J,x)->nothing, (H,x,λ)->nothing, bounds)
         state = IPNewtons.initial_state(method, options, d0, constraints, y)
         setstate!(state, μ, d0, constraints, method)
         @test IPNewtons.gf(bounds, state) ≈ -μ./y
@@ -176,7 +177,7 @@ using IPNewtons, PositiveFactorizations
         # TODO: Fix autodiff check
         #check_autodiff(d0, bounds, x, cfun, bstate, μ)
         constraints = TwiceDifferentiableConstraints(
-            (x,c)->nothing, (x,J)->nothing, (x,λ,H)->nothing, bounds)
+            (c,x)->nothing, (J,x)->nothing, (H,x,λ)->nothing, bounds)
         state = IPNewtons.initial_state(method, options, d0, constraints, x)
         copy!(state.bstate.slack_x, bstate.slack_x)
         copy!(state.bstate.λx, bstate.λx)
@@ -206,17 +207,17 @@ using IPNewtons, PositiveFactorizations
         @test IPNewtons.Hf(constraints, state) ≈ Diagonal(hxs)
         ## Nonlinear equality constraints
         cfun = x->[x[1]^2+x[2]^2, x[2]*x[3]^2]
-        cfun! = (x, c) -> copy!(c, cfun(x))
-        cJ! = (x, J) -> copy!(J, [2*x[1] 2*x[2] 0;
+        cfun! = (c, x) -> copy!(c, cfun(x))
+        cJ! = (J, x) -> copy!(J, [2*x[1] 2*x[2] 0;
                                   0 x[3]^2 2*x[2]*x[3]])
-        ch! = function(x, λ, h)
+        ch! = function(h, x, λ)
             h[1,1] += 2*λ[1]
             h[2,2] += 2*λ[1]
             h[3,3] += 2*λ[2]*x[2]
         end
         c = cfun(x)
         J = ForwardDiff.jacobian(cfun, x)
-        Jtmp = similar(J); @test cJ!(x, Jtmp) ≈ J  # just to check we did it right
+        Jtmp = similar(J); @test cJ!(Jtmp, x) ≈ J  # just to check we did it right
         cbar = rand(length(c))
         bounds = IPNewtons.ConstraintBounds([], [], cbar, cbar)
         bstate = IPNewtons.BarrierStateVars(bounds, x, c)
@@ -234,7 +235,7 @@ using IPNewtons, PositiveFactorizations
         copy!(state.bstate.λcE, bstate.λcE)
         setstate!(state, μ, d0, constraints, method)
         heq = zeros(length(x), length(x))
-        ch!(x, bstate.λcE, heq)
+        ch!(heq, x, bstate.λcE)
         @test IPNewtons.gf(bounds, state) ≈ [gx; cbar-c]
         @test IPNewtons.Hf(constraints, state) ≈ [full(cholfact(Positive, heq)) -J';
                                               -J zeros(size(J,1), size(J,1))]
@@ -264,7 +265,7 @@ using IPNewtons, PositiveFactorizations
         for (i,j) in enumerate(bounds.ineqc)
             λ[j] += bstate.λc[i]*bounds.σc[i]
         end
-        ch!(x, λ, hineq)
+        ch!(hineq, x, λ)
         JI = J[bounds.ineqc,:]
         # # Primal
         # hxx = μ*JI'*Diagonal(1./bstate.slack_c.^2)*JI - hineq
@@ -283,7 +284,7 @@ using IPNewtons, PositiveFactorizations
         x = [1.0,0.1,0.3,0.4]
         ## A linear objective function (hessian is zero)
         f_g = [1.0,2.0,3.0,4.0]
-        d = TwiceDifferentiable(x->dot(x, f_g), (x,g)->copy!(g, f_g), (x,h)->fill!(h, 0), x)
+        d = TwiceDifferentiable(x->dot(x, f_g), (g,x)->copy!(g, f_g), (h,x)->fill!(h, 0), x)
         # Variable bounds
         constraints = TwiceDifferentiableConstraints([0.5, 0.0, -Inf, -Inf], [Inf, Inf, 1.0, 0.8])
         state = IPNewtons.initial_state(method, options, d, constraints, x)
@@ -291,9 +292,9 @@ using IPNewtons, PositiveFactorizations
         @test norm(f_g - state.g) ≈ 0.01*norm(f_g)
         # Nonlinear inequalities
         constraints = TwiceDifferentiableConstraints(
-            (x,c)->(c[1]=x[1]*x[2]; c[2]=3*x[3]+x[4]^2),
-            (x,J)->(J[:,:] = [x[2] x[1] 0 0; 0 0 3 2*x[4]]),
-            (x,λ,h)->(h[4,4] += λ[2]*2),
+            (c,x)->(c[1]=x[1]*x[2]; c[2]=3*x[3]+x[4]^2),
+            (J,x)->(J[:,:] = [x[2] x[1] 0 0; 0 0 3 2*x[4]]),
+            (h,x,λ)->(h[4,4] += λ[2]*2),
             [], [], [0.05, 0.4], [0.15, 4.4])
         @test isinterior(constraints, x)
         state = IPNewtons.initial_state(method, options, d, constraints, x)
@@ -301,15 +302,15 @@ using IPNewtons, PositiveFactorizations
         @test norm(f_g - state.g) ≈ 0.01*norm(f_g)
         # Mixed equalities and inequalities
         constraints = TwiceDifferentiableConstraints(
-            (x,c)->(c[1]=x[1]*x[2]; c[2]=3*x[3]+x[4]^2),
-            (x,J)->(J[:,:] = [x[2] x[1] 0 0; 0 0 3 2*x[4]]),
-            (x,λ,h)->(h[4,4] += λ[2]*2),
+            (c,x)->(c[1]=x[1]*x[2]; c[2]=3*x[3]+x[4]^2),
+            (J,x)->(J .= [x[2] x[1] 0 0; 0 0 3 2*x[4]]),
+            (h,x,λ)->(h[4,4] += λ[2]*2),
             [], [], [0.1, 0.4], [0.1, 4.4])
         @test isfeasible(constraints, x)
         state = IPNewtons.initial_state(method, options, d, constraints, x)
         IPNewtons.update_fg!(d, constraints, state, method)
         J = zeros(2,4)
-        constraints.jacobian!(x, J)
+        constraints.jacobian!(J, x)
         eqnormal = vec(J[1,:]); eqnormal = eqnormal/norm(eqnormal)
         @test abs(dot(state.g, eqnormal)) < 1e-12  # orthogonal to equality constraint
         Pfg = f_g - dot(f_g, eqnormal)*eqnormal
@@ -330,9 +331,9 @@ using IPNewtons, PositiveFactorizations
         @test abs(dot(gx, state.H*gx)/dot(gx, hx*gx) - 1) <= 0.011
         # Nonlinear inequalities
         constraints = TwiceDifferentiableConstraints(
-            (x,c)->(c[1]=x[1]*x[2]; c[2]=3*x[3]+x[4]^2),
-            (x,J)->(J[:,:] = [x[2] x[1] 0 0; 0 0 3 2*x[4]]),
-            (x,λ,h)->(h[4,4] += λ[2]*2),
+            (c,x)->(c[1]=x[1]*x[2]; c[2]=3*x[3]+x[4]^2),
+            (J,x)->(J[:,:] = [x[2] x[1] 0 0; 0 0 3 2*x[4]]),
+            (h,x,λ)->(h[4,4] += λ[2]*2),
             [], [], [0.05, 0.4], [0.15, 4.4])
         @test isinterior(constraints, x)
         state = IPNewtons.initial_state(method, options, d, constraints, x)
@@ -342,15 +343,15 @@ using IPNewtons, PositiveFactorizations
         @test abs(dot(gx, state.H*gx)/dot(gx, hx*gx) - 1) <= 0.011
         # Mixed equalities and inequalities
         constraints = TwiceDifferentiableConstraints(
-            (x,c)->(c[1]=x[1]*x[2]; c[2]=3*x[3]+x[4]^2),
-            (x,J)->(J[:,:] = [x[2] x[1] 0 0; 0 0 3 2*x[4]]),
-            (x,λ,h)->(h[4,4] += λ[2]*2),
+            (c,x)->(c[1]=x[1]*x[2]; c[2]=3*x[3]+x[4]^2),
+            (J,x)->(J[:,:] = [x[2] x[1] 0 0; 0 0 3 2*x[4]]),
+            (h,x,λ)->(h[4,4] += λ[2]*2),
             [], [], [0.1, 0.4], [0.1, 4.4])
         @test isfeasible(constraints, x)
         state = IPNewtons.initial_state(method, options, d, constraints, x)
         IPNewtons.update_fg!(d, constraints, state, method)
         J = zeros(2,4)
-        constraints.jacobian!(x, J)
+        constraints.jacobian!(J, x)
         eqnormal = vec(J[1,:]); eqnormal = eqnormal/norm(eqnormal)
         @test abs(dot(state.g, eqnormal)) < 1e-12  # orthogonal to equality constraint
         Pgx = gx - dot(gx, eqnormal)*eqnormal
@@ -456,9 +457,9 @@ using IPNewtons, PositiveFactorizations
             # |x| >= 1 using the linear/nonlinear constraints
             d = TwiceDifferentiable(x->F*(x[1]-σ), (g, x) -> (g[1] = F), (h, x) -> (h[1,1] = 0), [0.0,])
             constraints = TwiceDifferentiableConstraints(
-                (x,c)->(c[1] = x[1]),
-                (x,J)->(J[1,1] = 1.0),
-                (x,λ,h)->nothing,
+                (c,x)->(c[1] = x[1]),
+                (J,x)->(J[1,1] = 1.0),
+                (h,x,λ)->nothing,
                 [], [], σswap(σ, [Float64(σ)], [])...)
             state = IPNewtons.initial_state(method, options, d, constraints, [(1+eps(1.0))*σ])
             for i = 1:10
