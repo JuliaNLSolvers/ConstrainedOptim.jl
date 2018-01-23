@@ -166,6 +166,7 @@ function update_h!(d, constraints::TwiceDifferentiableConstraints, state, method
 
     hessian!(d, state.x)  # objective's Hessian
     copy!(Hxx, hessian(d))  # objective's Hessian
+    state.h_calls += 1
     # accumulate the constraint second derivatives
     λ = userλ(bstate.λc, constraints)
     λ[bounds.eqc] = -bstate.λcE  # the negative sign is from the Hessian
