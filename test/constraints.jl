@@ -505,6 +505,7 @@ using IPNewtons, PositiveFactorizations
         [5,5], [15,15], [0.0], [0.0])
 
     options = OptimizationOptions(iterations = 1000, show_trace = false)
+
     xsol = [9.,12.]
     minval = NLSolversBase.value(df, xsol)
 
