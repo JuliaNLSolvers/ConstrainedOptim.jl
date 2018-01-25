@@ -53,7 +53,6 @@ function backtrack_constrained_grad(ϕ, α::Real, αmax::Real, Lcoefsα::Tuple{<
         end
         α *= ρ
     end
-    # TODO: Is this not an extra f_calls?
     ϕ(zero(α))  # to ensure that state gets set appropriately
     return zero(α)
 end
