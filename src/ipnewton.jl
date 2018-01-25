@@ -36,9 +36,6 @@ function Base.convert{T,S,N}(::Type{IPNewtonState{T,N}}, state::IPNewtonState{S,
     IPNewtonState(state.n,
                   convert(Array{T}, state.x),
                   T(state.f_x),
-                  state.f_calls,
-                  state.g_calls,
-                  state.h_calls,
                   convert(Array{T}, state.x_previous),
                   convert(Array{T}, state.g),
                   T(state.f_x_previous),
@@ -56,8 +53,8 @@ function Base.convert{T,S,N}(::Type{IPNewtonState{T,N}}, state::IPNewtonState{S,
                   convert(Array{T}, state.constr_c),
                   convert(Array{T}, state.constr_J),
                   T(state.ev),
+                  T(NaN),
                   convert(Array{T}, state.x_ls),
-                  convert(Array{T}, state.g_ls),
                   T(state.alpha),
                   state.mayterminate,
                   state.lsr,
@@ -73,7 +70,7 @@ function initial_state(method::IPNewton, options, d::TwiceDifferentiable, constr
     constr_c = Array{T}(mc)
     constraints.c!(constr_c, initial_x)
     if !isinterior(constraints, initial_x, constr_c)
-        warn("initial guess is not an interior point")
+        warn("Initial guess is not an interior point")
         Base.show_backtrace(STDERR, backtrace())
         println(STDERR)
     end
@@ -81,13 +78,13 @@ function initial_state(method::IPNewton, options, d::TwiceDifferentiable, constr
     n = length(initial_x)
     g = Vector{T}(n)
     s = Vector{T}(n)
-    f_x_previous, f_x = NaN, d.fdf(g, initial_x)
-    f_calls, g_calls = 1, 1
+    f_x_previous = NaN
+    f_x = value_gradient!(d, initial_x)
+    g .= gradient(d)
     H = Matrix{T}(n, n)
     Hd = Vector{Int8}(n)
     hessian!(d, initial_x)
     copy!(H, hessian(d))
-    h_calls = 1
 
     # More constraints
     constr_J = Array{T}(mc, n)
@@ -104,11 +101,8 @@ function initial_state(method::IPNewton, options, d::TwiceDifferentiable, constr
     state = IPNewtonState(length(initial_x),
         copy(initial_x), # Maintain current state in state.x
         f_x, # Store current f in state.f_x
-        f_calls, # Track f calls in state.f_calls
-        g_calls, # Track g calls in state.g_calls
-        h_calls,
         copy(initial_x), # Maintain current state in state.x_previous
-        g, # Store current gradient in state.g
+        g, # Store current gradient in state.g (TODO: includes Lagrangian calculation?)
         T(NaN), # Store previous f in state.f_x_previous
         H,
         0,    # will be replaced
@@ -139,14 +133,6 @@ end
 
 function update_fg!(d, constraints::TwiceDifferentiableConstraints, state, method::IPNewton)
     state.f_x, state.L, state.ev = lagrangian_fg!(state.g, state.bgrad, d, constraints.bounds, state.x, state.constr_c, state.constr_J, state.bstate, state.μ)
-    state.f_calls += 1
-    state.g_calls += 1
-    update_gtilde!(d, constraints, state, method)
-end
-
-function update_g!(d, constraints::TwiceDifferentiableConstraints, state, method::IPNewton)
-    lagrangian_g!(state.g, state.bgrad, d, constraints.bounds, state.x, state.constr_c, state.constr_J, state.bstate, state.μ)
-    state.g_calls += 1
     update_gtilde!(d, constraints, state, method)
 end
 
@@ -160,6 +146,7 @@ function update_gtilde!(d, constraints::TwiceDifferentiableConstraints, state, m
     JIc = view(state.constr_J, bounds.ineqc, :)
     if !isempty(JIc)
         Hssc = Diagonal(bstate.λc./bstate.slack_c)
+        # TODO: Can we use broadcasting / dot-notation here and eliminate gc?
         gc = JIc'*(Diagonal(bounds.σc) * (bstate.λc - Hssc*bgrad.λc))  # NOT bgrad.slack_c
         for i = 1:length(gtilde)
             gtilde[i] += gc[i]
@@ -212,7 +199,6 @@ function update_state!(d, constraints::TwiceDifferentiableConstraints, state::IP
         is_smaller_eps(bstate.λc, bstep.λc)
         return false
     end
-    # qp = quadratic_parameters(bounds, state)
 
     # Estimate αmax, the upper bound on distance of movement along the search line
     αmax = convert(eltype(bstate), Inf)
@@ -223,9 +209,10 @@ function update_state!(d, constraints::TwiceDifferentiableConstraints, state::IP
 
     # Determine the actual distance of movement along the search line
     ϕ = linesearch_anon(d, constraints, state, method)
-    state.alpha, f_update, g_update =
+    # TODO: How are we meant to implement backtracking_constrained?.
+    #       It requires both an alpha and an alphaI (αmax and αImax) ...
+    state.alpha =
         method.linesearch!(ϕ, T(1), αmax, qp; show_linesearch=options.show_linesearch)
-    state.f_calls, state.g_calls = state.f_calls + f_update, state.g_calls + g_update
 
     # Maintain a record of previous position
     copy!(state.x_previous, state.x)
@@ -337,41 +324,6 @@ function is_smaller_eps(ref, step)
         ise &= (s == 0) | (abs(s) < eps(r))
     end
     ise
-end
-
-"""
-    quadratic_parameters(bounds, state) -> val, slopeα, Hα
-
-OUTDATED! Return the parameters for the quadratic fit of the behavior of the
-lagrangian for positions parametrized as a function of the 4-vector
-`α = (αx, αs, αI, αE)`, where the step is
-
-    (αx * Δx, αs * Δs, αI * ΔλI, αE * ΔλE)
-
-and `Δx`, `Δs`, `ΔλI`, and `ΔλE` are the current search directions in
-the parameters. As a function of `α`, the local model is expressed as
-
-    val + dot(α, slopeα) + (α'*Hα*α)/2
-"""
-function quadratic_parameters(bounds::ConstraintBounds, state::IPNewtonState)
-    bstate, bstep, bgrad = state.bstate, state.bstep, state.bgrad
-    slopeα = slopealpha(state.s, state.g, bstep, bgrad)
-
-    jic = view(state.constr_J, bounds.ineqc, :)*state.s
-    HsscP = Diagonal(state.μ./bstate.slack_c.^2)  # for linesearch we need primal
-    jix = view(state.s, bounds.ineqx)
-    HssxP = Diagonal(state.μ./bstate.slack_x.^2)
-    ji = dot(bstep.λc, Diagonal(bounds.σc)*jic) + dot(bstep.λx, Diagonal(bounds.σx)*jix)
-    je = dot(bstep.λcE, view(state.constr_J, bounds.eqc, :)*state.s) +
-         dot(bstep.λxE, view(state.s, bounds.eqx))
-    hss = dot(bstep.slack_c, HsscP*bstep.slack_c) + dot(bstep.slack_x, HssxP*bstep.slack_x)
-    si = dot(bstep.slack_c, bstep.λc) + dot(bstep.slack_x, bstep.λx)
-    hxx = dot(state.s, full(state.HP)*state.s)  # TODO: don't require full here
-    Hα = [hxx    0    -ji   -je;
-          0      hss  si    0;
-          -ji    si   0     0;
-          -je    0    0     0]
-    state.L, slopeα, Hα
 end
 
 # Utility functions that assist in testing: they return the "full

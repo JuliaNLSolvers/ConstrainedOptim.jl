@@ -5,8 +5,11 @@ module IPNewtons
     using ForwardDiff
     using NLSolversBase, LineSearches
     using NaNMath
+    using Optim
 
-    import NLSolversBase: iscomplex, OnceDifferentiable, TwiceDifferentiable, AbstractObjective, hessian, hessian!
+    import NLSolversBase: iscomplex,  AbstractObjective, hessian, hessian!
+    import Optim: f_calls, g_calls, h_calls, OnceDifferentiable, TwiceDifferentiable
+
     import Base.length,
            Base.push!,
            Base.show,

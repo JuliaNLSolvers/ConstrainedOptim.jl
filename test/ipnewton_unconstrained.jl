@@ -1,5 +1,5 @@
 @testset "IPNewton Unconstrained" begin
-    run_optim_tests(IPNewton(); show_name=true, show_res=true)
+    run_optim_tests(IPNewton(); show_name=true, show_res=false, show_itcalls=true)
 
     # prob = UP.examples["Rosenbrock"]
     # df = TwiceDifferentiable(UP.objective(prob), UP.gradient(prob),

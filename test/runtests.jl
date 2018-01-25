@@ -11,6 +11,7 @@ UP = OptimTestProblems.UnconstrainedProblems
 debug_printing = true
 
 my_tests = [
+    "counter.jl",
     "ipnewton_unconstrained.jl",
     "constraints.jl",
 ]#"constrained.jl"]
@@ -24,7 +25,8 @@ function run_optim_tests(method; convergence_exceptions = (),
                          skip = (),
                          show_name = false,
                          show_trace = false,
-                         show_res = false)
+                         show_res = false,
+                         show_itcalls = false)
     # Loop over unconstrained problems
     for (name, prob) in OptimTestProblems.UnconstrainedProblems.examples
         if !isfinite(prob.minimum) || !any(isfinite, prob.solutions)
@@ -50,6 +52,10 @@ function run_optim_tests(method; convergence_exceptions = (),
             results = optimize(df,constraints,prob.initial_x, method, options)
             @test isa(summary(results), String)
             show_res && println(results)
+            show_itcalls && print_with_color(:red, "Iterations: $(IPNewtons.iterations(results))\n")
+            show_itcalls && print_with_color(:red, "f-calls: $(IPNewtons.f_calls(results))\n")
+            show_itcalls && print_with_color(:red, "g-calls: $(IPNewtons.g_calls(results))\n")
+            show_itcalls && print_with_color(:red, "h-calls: $(IPNewtons.h_calls(results))\n")
             if !(name in convergence_exceptions)
                 @test IPNewtons.converged(results)
             end

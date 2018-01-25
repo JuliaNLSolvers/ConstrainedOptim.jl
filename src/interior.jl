@@ -248,9 +248,9 @@ function optimize(d::AbstractObjective, constraints::AbstractConstraints, initia
                                             g_converged,
                                             options.g_tol,
                                             tr,
-                                            state.f_calls,
-                                            state.g_calls,
-                                            state.h_calls)
+                                            f_calls(d),
+                                            g_calls(d),
+                                            h_calls(d))
 end
 
 # Fallbacks (for methods that don't need these)
@@ -430,30 +430,24 @@ userλ(λcI, constraints) = userλ(λcI, constraints.bounds)
 # This is in a parametrization that is also useful during linesearch
 
 function lagrangian(d, bounds::ConstraintBounds, x, c, bstate::BarrierStateVars, μ)
-    f_x = d.f(x)
+    f_x = NLSolversBase.value!(d, x)
     ev = equality_violation(bounds, x, c, bstate)
     L_xsλ = f_x + barrier_value(bounds, x, bstate, μ) + ev
     f_x, L_xsλ, ev
-end
-
-function lagrangian_g!(gx, bgrad, d, bounds::ConstraintBounds, x, c, J, bstate::BarrierStateVars, μ)
-    fill!(bgrad, 0)
-    d.df(gx,x)
-    barrier_grad!(gx, bgrad, bounds, x, bstate, μ)
-    equality_grad!(gx, bgrad, bounds, x, c, J, bstate)
-    nothing
 end
 
 function lagrangian_fg!(gx, bgrad, d, bounds::ConstraintBounds, x, c, J, bstate::BarrierStateVars, μ)
     fill!(bgrad, 0)
-    f_x = d.fdf(gx, x)
+    f_x = NLSolversBase.value_gradient!(d,x)
+    gx .= NLSolversBase.gradient(d)
     ev = equality_violation(bounds, x, c, bstate)
     L_xsλ = f_x + barrier_value(bounds, x, bstate, μ) + ev
-    barrier_grad!(gx, bgrad, bounds, x, bstate, μ)
+    barrier_grad!(bgrad, bounds, x, bstate, μ)
     equality_grad!(gx, bgrad, bounds, x, c, J, bstate)
     f_x, L_xsλ, ev
 end
 
+# TODO: do we need lagrangian_vec? Maybe for automatic differentiation?
 ## Computation of Lagrangian and derivatives when passing all parameters as a single vector
 function lagrangian_vec(p, d, bounds::ConstraintBounds, x, c::AbstractArray, bstate::BarrierStateVars, μ)
     unpack_vec!(x, bstate, p)
@@ -510,8 +504,8 @@ function _lagrangian_lineslope(αs, d, constraints, state)
     ls_update!(b_ls.bstate, state.bstate, bstep, αs)
     constraints.c!(b_ls.c, state.x_ls)
     constraints.jacobian!(b_ls.J, state.x_ls)
-    f_x, L, ev = lagrangian_fg!(state.g_ls, bgrad, d, bounds, state.x_ls, b_ls.c, b_ls.J, b_ls.bstate, state.μ)
-    slopeα = slopealpha(state.s, state.g_ls, bstep, bgrad)
+    f_x, L, ev = lagrangian_fg!(state.g, bgrad, d, bounds, state.x_ls, b_ls.c, b_ls.J, b_ls.bstate, state.μ)
+    slopeα = slopealpha(state.s, state.g, bstep, bgrad)
     f_x, L, ev, slopeα
 end
 
@@ -572,24 +566,24 @@ _bv(v) = isempty(v) ? loginf(one(eltype(v))) : -sum(loginf, v)
 loginf(δ) = δ > 0 ? log(δ) : -oftype(δ, Inf)
 
 """
-    barrier_grad!(gx, bgrad, bounds, x, bstate, μ)
-    barrier_grad!(gx, gsx, gsc, bounds, x, sx, sc, μ)
+    barrier_grad!(bgrad, bounds, x, bstate, μ)
+    barrier_grad!(gsx, gsc, bounds, x, sx, sc, μ)
 
 Compute the gradient of the barrier penalty at (`x`,`sx`,`sc`), where
 `x` is the current position, `sx` are the coordinate slack variables,
 and `sc` are the linear/nonlinear slack
 variables. `bounds::ConstraintBounds` holds the parsed bounds.
 
-The result is *added* to `gx`, `gsx`, and `gsc`, so these vectors
+The result is *added* to `gsx`, and `gsc`, so these vectors
 need to be initialized appropriately.
 """
-function barrier_grad!(gx, gsx, gsc, bounds::ConstraintBounds, x, sx, sc, μ)
+function barrier_grad!(gsx, gsc, bounds::ConstraintBounds, x, sx, sc, μ)
     barrier_grad!(gsx, sx, μ)
     barrier_grad!(gsc, sc, μ)
     nothing
 end
-barrier_grad!(gx, bgrad, bounds::ConstraintBounds, x, bstate, μ) =
-    barrier_grad!(gx, bgrad.slack_x, bgrad.slack_c, bounds, x, bstate.slack_x, bstate.slack_c, μ)
+barrier_grad!(bgrad, bounds::ConstraintBounds, x, bstate, μ) =
+    barrier_grad!(bgrad.slack_x, bgrad.slack_c, bounds, x, bstate.slack_x, bstate.slack_c, μ)
 
 function barrier_grad!(out, v, μ)
     for i = 1:length(out)
@@ -663,7 +657,7 @@ Compute the gradient of `equality_violation`, storing the result in `gx` (an arr
 function equality_grad!(gx, gsx, gsc, gλx, gλc, gλxE, gλcE, bounds::ConstraintBounds, x, c, J, sx, sc, λx, λc, λxE, λcE)
     equality_grad_var!(gsx, gx, bounds.ineqx, bounds.σx, λx)
     equality_grad_var!(gsc, gx, bounds.ineqc, bounds.σc, λc, J)
-    gx[bounds.eqx] = gx[bounds.eqx] - λxE
+    gx[bounds.eqx] .= gx[bounds.eqx] .- λxE
     equality_grad_var!(gx, bounds.eqc, λcE, J)
     equality_grad_λ!(gλx, sx, x, bounds.ineqx, bounds.σx, bounds.bx)
     equality_grad_λ!(gλc, sc, c, bounds.ineqc, bounds.σc, bounds.bc)

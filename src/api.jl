@@ -22,6 +22,8 @@ f_calls(r::OptimizationResults) = r.f_calls
 
 g_calls(r::OptimizationResults) = error("g_calls is not implemented for $(method(r)).")
 g_calls(r::MultivariateOptimizationResults) = r.g_calls
+h_calls(r::OptimizationResults) = error("h_calls is not implemented for $(method(r)).")
+h_calls(r::MultivariateOptimizationResults) = r.h_calls
 
 converged(r::MultivariateOptimizationResults) = r.x_converged || r.f_converged || r.g_converged
 x_converged(r::OptimizationResults) = error("x_converged is not implemented for $(method(r)).")

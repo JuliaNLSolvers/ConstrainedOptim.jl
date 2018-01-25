@@ -412,8 +412,10 @@ using IPNewtons, PositiveFactorizations
         val0 = ϕ(0.0)
         val0 = isa(val0, Tuple) ? val0[1] : val0
         @test val0 ≈ qp[1]
-        α, nf, ng = method.linesearch!(ϕ, 1.0, αmax, qp)
+        α = method.linesearch!(ϕ, 1.0, αmax, qp)
         @test α > 1e-3
+
+        # TODO: Add linesearch_anon tests for IPNewton(linesearch! = backtracking_constrained)
     end
 
     @testset "Slack" begin
@@ -494,6 +496,25 @@ using IPNewtons, PositiveFactorizations
     # results = optimize(df,constraints, CP.x0, IPNewton(), options) #x0 = [0,0]
     # @test IPNewtons.converged(results)
     # @test IPNewtons.minimum(results) < minval + sqrt(eps(minval))
+
+
+    CP = IPNewtons.ConstrainedProblems
+    df = TwiceDifferentiable(CP.hs9_obj,CP.hs9_obj_g!,CP.hs9_obj_h!,CP.x0)
+    constraints = TwiceDifferentiableConstraints(
+        CP.hs9_c!, CP.hs9_jacobian!, CP.hs9_h!,
+        [5,5], [15,15], [0.0], [0.0])
+
+    options = OptimizationOptions(iterations = 1000, show_trace = false)
+
+    xsol = [9.,12.]
+    minval = NLSolversBase.value(df, xsol)
+
+    results = optimize(df,constraints, [12, 14.0], IPNewton(), options)
+    @test isa(summary(results), String)
+    @test IPNewtons.converged(results)
+    @test IPNewtons.minimum(results) < minval + sqrt(eps(minval))
+
+
 end
 end
 
