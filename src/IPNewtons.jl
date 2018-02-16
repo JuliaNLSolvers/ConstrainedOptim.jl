@@ -59,8 +59,4 @@ module IPNewtons
 
     # Traces
     include("utilities/trace.jl")
-
-    # Examples for testing
-    include(joinpath("problems", "constrained.jl"))
-#    using .MultivariateProblems
 end
