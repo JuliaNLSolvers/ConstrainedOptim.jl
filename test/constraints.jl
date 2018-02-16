@@ -228,8 +228,8 @@ using IPNewtons, PositiveFactorizations
         @test L ≈ dot(bstate.λcE, cbar-c)
         @test gx ≈ -J'*bstate.λcE
         @test bgrad.λcE == cbar-c
-# TODO: Fix autodiff check
-#check_autodiff(d0, bounds, x, cfun, bstate, μ)
+        # TODO: Fix autodiff check
+        #check_autodiff(d0, bounds, x, cfun, bstate, μ)
         constraints = TwiceDifferentiableConstraints(cfun!, cJ!, ch!, bounds)
         state = IPNewtons.initial_state(method, options, d0, constraints, x)
         copy!(state.bstate.λcE, bstate.λcE)
@@ -238,7 +238,7 @@ using IPNewtons, PositiveFactorizations
         ch!(heq, x, bstate.λcE)
         @test IPNewtons.gf(bounds, state) ≈ [gx; cbar-c]
         @test IPNewtons.Hf(constraints, state) ≈ [full(cholfact(Positive, heq)) -J';
-                                              -J zeros(size(J,1), size(J,1))]
+                                                  -J zeros(size(J,1), size(J,1))]
         ## Nonlinear inequality constraints
         bounds = IPNewtons.ConstraintBounds([], [], -rand(length(c))-1, rand(length(c))+2)
         bstate = IPNewtons.BarrierStateVars(bounds, x, c)
@@ -253,8 +253,8 @@ using IPNewtons, PositiveFactorizations
         @test gx ≈ -J[bounds.ineqc,:]'*(bstate.λc.*bounds.σc)
         @test bgrad.slack_c == -μ./bstate.slack_c + bstate.λc
         @test bgrad.λc == bstate.slack_c - bounds.σc .* (c[bounds.ineqc] - bounds.bc)
-# TODO: Fix autodiff check
-#check_autodiff(d0, bounds, x, cfun, bstate, μ)
+        # TODO: Fix autodiff check
+        #check_autodiff(d0, bounds, x, cfun, bstate, μ)
         constraints = TwiceDifferentiableConstraints(cfun!, cJ!, ch!, bounds)
         state = IPNewtons.initial_state(method, options, d0, constraints, x)
         copy!(state.bstate.slack_c, bstate.slack_c)
@@ -271,7 +271,7 @@ using IPNewtons, PositiveFactorizations
         # hxx = μ*JI'*Diagonal(1./bstate.slack_c.^2)*JI - hineq
         # gf = -JI'*(bounds.σc .* bstate.λc) + JI'*Diagonal(bounds.σc)*(bgrad.slack_c - μ(bgrad.λc ./ bstate.slack_c.^2))
         # Primal-dual
-#        hxx = full(cholfact(Positive, -hineq)) + JI'*Diagonal(bstate.λc./bstate.slack_c)*JI
+        #        hxx = full(cholfact(Positive, -hineq)) + JI'*Diagonal(bstate.λc./bstate.slack_c)*JI
         hxx = -hineq + JI'*Diagonal(bstate.λc./bstate.slack_c)*JI
         gf = -JI'*(bounds.σc .* bstate.λc) + JI'*Diagonal(bounds.σc)*(bgrad.slack_c - (bgrad.λc .* bstate.λc ./ bstate.slack_c))
         @test IPNewtons.gf(bounds, state) ≈ gf
@@ -407,7 +407,7 @@ using IPNewtons, PositiveFactorizations
         #@test [qp[3]] ≈ H0 # μ/x0^2*(x0 - F*x0^2/μ)^2
         bstate, bstep, bounds = state.bstate, state.bstep, constraints.bounds
         αmax = IPNewtons.estimate_maxstep(Inf, state.x[bounds.ineqx].*bounds.σx,
-                                           state.s[bounds.ineqx].*bounds.σx)
+                                          state.s[bounds.ineqx].*bounds.σx)
         ϕ = IPNewtons.linesearch_anon(d, constraints, state, method)
         val0 = ϕ(0.0)
         val0 = isa(val0, Tuple) ? val0[1] : val0
@@ -474,48 +474,50 @@ using IPNewtons, PositiveFactorizations
         end
     end
 
-@testset "Constrained optimization" begin
-    CP = IPNewtons.ConstrainedProblems
-    df = TwiceDifferentiable(CP.hs9_obj,CP.hs9_obj_g!,CP.hs9_obj_h!,CP.x0)
-    constraints = TwiceDifferentiableConstraints(
-        CP.hs9_c!, CP.hs9_jacobian!, CP.hs9_h!,
-        [], [], [0.0], [0.0])
+    @testset "Constrained optimization" begin
+        # TODO: Add more problems
+        mcvp = MVP.ConstrainedProblems.examples
 
-    options = OptimizationOptions(iterations = 1000, show_trace = false)
+        for (name, prob) in mcvp
+            debug_printing && print_with_color(:green, "Problem: ", name, "\n")
+            df = TwiceDifferentiable(MVP.objective(prob), MVP.gradient(prob),
+                                     MVP.objective_gradient(prob), MVP.hessian(prob), prob.initial_x)
 
-    xsol = [-3.,-4]
-    minval = NLSolversBase.value(df, xsol)
+            cd = prob.constraintdata
+            constraints = TwiceDifferentiableConstraints(
+                cd.c!, cd.jacobian!, cd.h!,
+                cd.lx, cd.ux, cd.lc, cd.uc)
 
-    results = optimize(df,constraints, [-1, 2.], IPNewton(), options)
-    @test isa(summary(results), String)
-    @test IPNewtons.converged(results)
-    @test IPNewtons.minimum(results) < minval + sqrt(eps(minval))
+            options = OptimizationOptions(iterations = 1000, show_trace = false)
 
-    # TODO: The algorithm gets stuck when using x0 = [0,0]
-    #       Check with Tim if this also happened before?
-    # results = optimize(df,constraints, CP.x0, IPNewton(), options) #x0 = [0,0]
-    # @test IPNewtons.converged(results)
-    # @test IPNewtons.minimum(results) < minval + sqrt(eps(minval))
+            minval = NLSolversBase.value(df, prob.solutions)
 
+            results = optimize(df,constraints, prob.initial_x, IPNewton(), options)
+            @test isa(summary(results), String)
+            @test IPNewtons.converged(results)
+            @test IPNewtons.minimum(results) < minval + sqrt(eps(minval))
+        end
 
-    CP = IPNewtons.ConstrainedProblems
-    df = TwiceDifferentiable(CP.hs9_obj,CP.hs9_obj_g!,CP.hs9_obj_h!,CP.x0)
-    constraints = TwiceDifferentiableConstraints(
-        CP.hs9_c!, CP.hs9_jacobian!, CP.hs9_h!,
-        [5,5], [15,15], [0.0], [0.0])
+        # Test constraints on both x and c
+        prob = mcvp["HS9"]
+        df = TwiceDifferentiable(MVP.objective(prob), MVP.gradient(prob),
+                                 MVP.objective_gradient(prob), MVP.hessian(prob), prob.initial_x)
 
-    options = OptimizationOptions(iterations = 1000, show_trace = false)
+        cd = prob.constraintdata
+        lx = [5,5]; ux = [15,15]
+        constraints = TwiceDifferentiableConstraints(
+            cd.c!, cd.jacobian!, cd.h!,
+            lx, ux, cd.lc, cd.uc)
 
-    xsol = [9.,12.]
-    minval = NLSolversBase.value(df, xsol)
+        options = OptimizationOptions(iterations = 1000, show_trace = false)
 
-    results = optimize(df,constraints, [12, 14.0], IPNewton(), options)
-    @test isa(summary(results), String)
-    @test IPNewtons.converged(results)
-    @test IPNewtons.minimum(results) < minval + sqrt(eps(minval))
+        xsol = [9.,12.]
+        x0   = [12. 14.0]
+        minval = NLSolversBase.value(df, xsol)
 
-
+        results = optimize(df,constraints, [12, 14.0], IPNewton(), options)
+        @test isa(summary(results), String)
+        @test IPNewtons.converged(results)
+        @test IPNewtons.minimum(results) < minval + sqrt(eps(minval))
+    end
 end
-end
-
-nothing

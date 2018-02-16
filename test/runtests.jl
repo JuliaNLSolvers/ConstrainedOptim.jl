@@ -6,8 +6,7 @@ using IPNewtons
 using Base.Test
 using Compat
 using OptimTestProblems
-UP = OptimTestProblems.UnconstrainedProblems
-
+MVP = OptimTestProblems.MultivariateProblems
 debug_printing = true
 
 my_tests = [
@@ -27,8 +26,9 @@ function run_optim_tests(method; convergence_exceptions = (),
                          show_trace = false,
                          show_res = false,
                          show_itcalls = false)
+    # TODO: Update with constraints?
     # Loop over unconstrained problems
-    for (name, prob) in OptimTestProblems.UnconstrainedProblems.examples
+    for (name, prob) in MVP.UnconstrainedProblems.examples
         if !isfinite(prob.minimum) || !any(isfinite, prob.solutions)
             debug_printing && println("$name has no registered minimum/minimizer. Skipping ...")
             continue
@@ -45,8 +45,8 @@ function run_optim_tests(method; convergence_exceptions = (),
         # Use finite difference if it is not differentiable enough
         if  !(name in skip) && prob.istwicedifferentiable
             # Loop over appropriate input combinations of f, g!, and h!
-            df = TwiceDifferentiable(UP.objective(prob), UP.gradient(prob),
-                                     UP.objective_gradient(prob), UP.hessian(prob), prob.initial_x)
+            df = TwiceDifferentiable(MVP.objective(prob), MVP.gradient(prob),
+                                     MVP.objective_gradient(prob), MVP.hessian(prob), prob.initial_x)
             infvec = fill(Inf, size(prob.initial_x))
             constraints = TwiceDifferentiableConstraints(-infvec, infvec)
             results = optimize(df,constraints,prob.initial_x, method, options)

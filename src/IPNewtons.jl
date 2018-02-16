@@ -7,7 +7,8 @@ module IPNewtons
     using NaNMath
     using Optim
 
-    import NLSolversBase: iscomplex,  AbstractObjective, hessian, hessian!
+    import NLSolversBase: iscomplex,  AbstractObjective, hessian, hessian!,
+    nconstraints, nconstraints_x
     import Optim: f_calls, g_calls, h_calls, OnceDifferentiable, TwiceDifferentiable
 
     import Base.length,
@@ -58,8 +59,4 @@ module IPNewtons
 
     # Traces
     include("utilities/trace.jl")
-
-    # Examples for testing
-    include(joinpath("problems", "constrained.jl"))
-#    using .MultivariateProblems
 end

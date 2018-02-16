@@ -36,15 +36,15 @@
 
     f(x) = begin
         fcounter()
-        UP.objective(prob)(x)
+        MVP.objective(prob)(x)
     end
     g!(out, x) = begin
         gcounter()
-        UP.gradient(prob)(out, x)
+        MVP.gradient(prob)(out, x)
     end
     h!(out, x) = begin
         hcounter()
-        UP.hessian(prob)(out, x)
+        MVP.hessian(prob)(out, x)
     end
 
     options = OptimizationOptions(iterations = 1000, show_trace = false)
