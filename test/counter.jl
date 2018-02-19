@@ -47,7 +47,7 @@
         MVP.hessian(prob)(out, x)
     end
 
-    options = OptimizationOptions(iterations = 1000, show_trace = false)
+    options = Options(; IPNewtons.default_options(IPNewton())...)
     # TODO: Run this on backtrack_constrained as well (when we figure out what it does)
     for ls in [IPNewtons.backtrack_constrained_grad,]
                #IPNewtons.backtrack_constrained]
@@ -56,10 +56,12 @@
 
         df = TwiceDifferentiable(f, g!, h!, prob.initial_x)
         infvec = fill(Inf, size(prob.initial_x))
+        # TODO: fix `optimize`so that empty constraints work
+        #constraints = TwiceDifferentiableConstraints([], [])
         constraints = TwiceDifferentiableConstraints(-infvec, infvec)
 
         res = optimize(df, constraints, prob.initial_x,
-                       IPNewton(linesearch! = ls),
+                       IPNewton(linesearch = ls),
                        options)
         @test fcount == Optim.f_calls(res)
         @test gcount == Optim.g_calls(res)

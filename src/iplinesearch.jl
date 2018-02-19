@@ -62,10 +62,13 @@ function evalgrad(slopeα, α, αI)
     α*(slopeα[1] + slopeα[2] + slopeα[4]) + αI*slopeα[3]
 end
 
+# TODO: Never used anywhere? Intended for a linesearch that depends on ϕ''?
 function mulhess(Hα, α, αI)
     αv = [α, α, αI, α]
     Hα*αv
 end
+
+# TODO: Never used anywhere? Intended for a linesearch that depends on ϕ''?
 function evalhess(Hα, α, αI)
     αv = [α, α, αI, α]
     dot(αv, Hα*αv)

@@ -111,7 +111,7 @@ Base.:(==)(v::BarrierStateVars, w::BarrierStateVars) =
 
 const bsv_seed = sizeof(UInt) == 64 ? 0x145b788192d1cde3 : 0x766a2810
 Base.hash(b::BarrierStateVars, u::UInt) =
-    hash(b.λcE, has(b.λxE, hash(b.λc, hash(b.λx, hash(b.slack_c, hash(b.slack_x, u+bsv_seed))))))
+    hash(b.λcE, hash(b.λxE, hash(b.λc, hash(b.λx, hash(b.slack_c, hash(b.slack_x, u+bsv_seed))))))
 
 function Base.dot(v::BarrierStateVars, w::BarrierStateVars)
     dot(v.slack_x,w.slack_x) +
@@ -174,38 +174,49 @@ ls_update!(out::BarrierStateVars, base::BarrierStateVars, step::BarrierStateVars
 ls_update!(out::BarrierStateVars, base::BarrierStateVars, step::BarrierStateVars, αs::AbstractVector) =
     ls_update!(out, base, step, αs[1]) # (αs...,))
 
-function optimize(d::AbstractObjective, constraints::AbstractConstraints, initial_x::Array{T}, method::M, options::OptimizationOptions) where {T, M<:ConstrainedOptimizer}
+function initial_convergence(d, state, method::ConstrainedOptimizer, initial_x, options)
+    # TODO: Make sure state.bgrad has been evaluated at initial_x
+    # state.bgrad normally comes from constraints.c!(..., initial_x) in initial_state
+    gradient!(d, initial_x)
+    vecnorm(gradient(d), Inf) + vecnorm(state.bgrad, Inf) < options.g_tol
+end
+
+function optimize(d::AbstractObjective, constraints::AbstractConstraints, initial_x::Tx, method::M,
+                  options::Options = Options(;default_options(method)...),
+                  state = initial_state(method, options, d, constraints, initial_x)) where {Tx, M<:ConstrainedOptimizer}
+    #== TODO:
+    Let's try to unify this with the unconstrained `optimize` in Optim
+    The only thing we'd have to deal with is to dispatch
+    the univariate `optimize` to one with empty constraints::AbstractConstraints
+    ==#
+
     t0 = time() # Initial time stamp used to control early stopping by options.time_limit
 
-    state = initial_state(method, options, d, constraints, initial_x)
-
-    tr = OptimizationTrace{typeof(method)}()
+    tr = OptimizationTrace{typeof(value(d)), typeof(method)}()
     tracing = options.store_trace || options.show_trace || options.extended_trace || options.callback != nothing
     stopped, stopped_by_callback, stopped_by_time_limit = false, false, false
+    f_limit_reached, g_limit_reached, h_limit_reached = false, false, false
+    x_converged, f_converged, f_increased, counter_f_tol = false, false, false, 0
 
-    x_converged, f_converged, counter_f_tol = false, false, 0
-    g_converged = vecnorm(state.g, Inf) + vecnorm(state.bgrad, Inf) < options.g_tol
-
+    g_converged = initial_convergence(d, state, method, initial_x, options)
     converged = g_converged
+
+    # prepare iteration counter (used to make "initial state" trace entry)
     iteration = 0
 
     options.show_trace && print_header(method)
+    trace!(tr, d, state, iteration, method, options)
 
     while !converged && !stopped && iteration < options.iterations
-        # If tracing, update trace with trace!. If a callback is provided, it
-        # should have boolean return value that controls the variable stopped_by_callback.
-        # This allows for early stopping controlled by the callback.
-        if tracing
-            stopped_by_callback = trace!(tr, state, iteration, method, options)
-        end
         iteration += 1
 
-        update_state!(d, constraints, state, method, options) && break # it returns true if it's forced by something in update! to stop (eg dx_dg == 0.0 in BFGS)
+        update_state!(d, constraints, state, method, options) && break # it returns true if it's forced by something in update! to stop (eg dx_dg == 0.0 in BFGS or linesearch errors)
 
         update_fg!(d, constraints, state, method)
 
+        # TODO: Do we need to rethink f_increased for `ConstrainedOptimizer`s?
         x_converged, f_converged,
-        g_converged, converged = assess_convergence(state, options)
+        g_converged, converged, f_increased = assess_convergence(state, d, options)
         # With equality constraints, optimization is not necessarily
         # monotonic in the value of the function. If the function
         # change is approximately canceled by a change in the equality
@@ -214,43 +225,59 @@ function optimize(d::AbstractObjective, constraints::AbstractConstraints, initia
         # be satisfied a certain number of times in a row before
         # declaring convergence.
         counter_f_tol = f_converged ? counter_f_tol+1 : 0
-        converged = x_converged | g_converged | (counter_f_tol > options.successive_f_tol)
+        converged = converged | (counter_f_tol > options.successive_f_tol)
 
         # We don't use the Hessian for anything if we have declared convergence,
         # so we might as well not make the (expensive) update if converged == true
         !converged && update_h!(d, constraints, state, method)
 
+        if tracing
+            # update trace; callbacks can stop routine early by returning true
+            stopped_by_callback = trace!(tr, d, state, iteration, method, options)
+        end
+
         # Check time_limit; if none is provided it is NaN and the comparison
         # will always return false.
         stopped_by_time_limit = time()-t0 > options.time_limit ? true : false
+        f_limit_reached = options.f_calls_limit > 0 && f_calls(d) >= options.f_calls_limit ? true : false
+        g_limit_reached = options.g_calls_limit > 0 && g_calls(d) >= options.g_calls_limit ? true : false
+        h_limit_reached = options.h_calls_limit > 0 && h_calls(d) >= options.h_calls_limit ? true : false
 
-        # Combine the two, so see if the stopped flag should be changed to true
-        # and stop the while loop
-        stopped = stopped_by_callback || stopped_by_time_limit ? true : false
+        if (f_increased && !options.allow_f_increases) || stopped_by_callback ||
+            stopped_by_time_limit || f_limit_reached || g_limit_reached || h_limit_reached
+            stopped = true
+        end
     end # while
-
-    if tracing
-        trace!(tr, state, iteration, method, options)
-    end
 
     after_while!(d, constraints, state, method, options)
 
-    return MultivariateOptimizationResults(summary(state),
-                                            initial_x,
-                                            state.x,
-                                            Float64(state.f_x),
-                                            iteration,
-                                            iteration == options.iterations,
-                                            x_converged,
-                                            options.x_tol,
-                                            f_converged,
-                                            options.f_tol,
-                                            g_converged,
-                                            options.g_tol,
-                                            tr,
-                                            f_calls(d),
-                                            g_calls(d),
-                                            h_calls(d))
+    # we can just check minimum, as we've earlier enforced same types/eltypes
+    # in variables besides the option settings
+    T = typeof(options.f_tol)
+    Tf = typeof(value(d))
+    f_incr_pick = f_increased && !options.allow_f_increases
+
+    return MultivariateOptimizationResults(method,
+                                        iscomplex(d),
+                                        real_to_complex(d, initial_x),
+                                        real_to_complex(d, pick_best_x(f_incr_pick, state)),
+                                        pick_best_f(f_incr_pick, state, d),
+                                        iteration,
+                                        iteration == options.iterations,
+                                        x_converged,
+                                        T(options.x_tol),
+                                        x_abschange(state),
+                                        f_converged,
+                                        T(options.f_tol),
+                                        f_abschange(d, state),
+                                        g_converged,
+                                        T(options.g_tol),
+                                        g_residual(d),
+                                        f_increased,
+                                        tr,
+                                        f_calls(d),
+                                        g_calls(d),
+                                        h_calls(d))
 end
 
 # Fallbacks (for methods that don't need these)
@@ -836,7 +863,7 @@ function estimate_maxstep(αmax, x, s)
 end
 
 function shrink_μ!(d, constraints, state, method, options)
-    state.μ *= options.μfactor
+    state.μ *= method.μfactor
     update_fg!(d, constraints, state, method)
 end
 

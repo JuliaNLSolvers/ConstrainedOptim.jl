@@ -70,8 +70,8 @@ using IPNewtons, PositiveFactorizations
         cfun = x->Float64[]
         c = Float64[]
         J = Array{Float64}(0,0)
-        options = OptimizationOptions(μ0 = μ)
-        method = IPNewtons.IPNewton()
+        method = IPNewtons.IPNewton(μ0 = μ)
+        options = Options(; IPNewtons.default_options(method)...)
         ## In the code, variable constraints are special-cased (for
         ## reasons of user-convenience and efficiency).  It's
         ## important to check that the special-casing yields the same
@@ -280,7 +280,7 @@ using IPNewtons, PositiveFactorizations
 
     @testset "IPNewton initialization" begin
         method = IPNewton()
-        options = OptimizationOptions()
+        options = Options(; IPNewtons.default_options(method)...)
         x = [1.0,0.1,0.3,0.4]
         ## A linear objective function (hessian is zero)
         f_g = [1.0,2.0,3.0,4.0]
@@ -375,9 +375,10 @@ using IPNewtons, PositiveFactorizations
             # TODO: It doesn't seem like it is possible to to create a dual where the values are duals?
             # TD2 = ForwardDiff.Dual{chunksize, ForwardDiff.Dual{chunksize, eltype(p)}}
             # TD2 = ForwardDiff.Dual{ForwardDiff.Tag{Void,Float64}, typeof(TD), chunksize}
-            stated = convert(IPNewtons.IPNewtonState{TD,1}, state)
+            Tx = typeof(state.x)
+            stated = convert(IPNewtons.IPNewtonState{TD, Tx,1}, state)
             # TODO: Uncomment
-            #stated2 = convert(IPNewtons.IPNewtonState{TD2,1}, state)
+            #stated2 = convert(IPNewtons.IPNewtonState{TD2, Tx, 1}, state)
 
             ϕd = αs->IPNewtons.lagrangian_linefunc(αs, d, constraints, stated)
             # TODO: Uncomment
@@ -388,9 +389,9 @@ using IPNewtons, PositiveFactorizations
         end
         F = 1000
         d = TwiceDifferentiable(x->F*x[1], (g, x) -> (g[1] = F), (h, x) -> (h[1,1] = 0), [0.0,])
-        method = IPNewtons.IPNewton()
         μ = 1e-20
-        options = OptimizationOptions(μ0=μ)
+        method = IPNewtons.IPNewton(μ0=μ)
+        options = Options(; IPNewtons.default_options(method)...)
         x0 = μ/F*10  # minimum is at μ/F
         # Nonnegativity (the case that doesn't require slack variables)
         constraints = TwiceDifferentiableConstraints([0.0], [])
@@ -428,9 +429,9 @@ using IPNewtons, PositiveFactorizations
         # widely spaced to accurately satisfy the KKT equations near a
         # boundary).
         F0 = 1000
-        method = IPNewtons.IPNewton()
         μ = 1e-20   # smaller than eps(1.0)
-        options = OptimizationOptions(μ0=μ)
+        method = IPNewtons.IPNewton(μ0=μ)
+        options = Options(; IPNewtons.default_options(method)...)
         for σ in (1, -1)
             F = σ*F0
             # Nonnegativity/nonpositivity (the case that doesn't require slack variables)
@@ -477,6 +478,7 @@ using IPNewtons, PositiveFactorizations
     @testset "Constrained optimization" begin
         # TODO: Add more problems
         mcvp = MVP.ConstrainedProblems.examples
+        method = IPNewton()
 
         for (name, prob) in mcvp
             debug_printing && print_with_color(:green, "Problem: ", name, "\n")
@@ -488,14 +490,19 @@ using IPNewtons, PositiveFactorizations
                 cd.c!, cd.jacobian!, cd.h!,
                 cd.lx, cd.ux, cd.lc, cd.uc)
 
-            options = OptimizationOptions(iterations = 1000, show_trace = false)
+            options = Options(; IPNewtons.default_options(method)...)
 
             minval = NLSolversBase.value(df, prob.solutions)
 
-            results = optimize(df,constraints, prob.initial_x, IPNewton(), options)
+            results = optimize(df,constraints, prob.initial_x, method, options)
             @test isa(summary(results), String)
-            @test IPNewtons.converged(results)
-            @test IPNewtons.minimum(results) < minval + sqrt(eps(minval))
+            @test Optim.converged(results)
+            @test Optim.minimum(results) < minval + sqrt(eps(minval))
+
+            debug_printing && print_with_color(:red, "Iterations: $(Optim.iterations(results))\n")
+            debug_printing && print_with_color(:red, "f-calls: $(Optim.f_calls(results))\n")
+            debug_printing && print_with_color(:red, "g-calls: $(Optim.g_calls(results))\n")
+            debug_printing && print_with_color(:red, "h-calls: $(Optim.h_calls(results))\n")
         end
 
         # Test constraints on both x and c
@@ -509,15 +516,15 @@ using IPNewtons, PositiveFactorizations
             cd.c!, cd.jacobian!, cd.h!,
             lx, ux, cd.lc, cd.uc)
 
-        options = OptimizationOptions(iterations = 1000, show_trace = false)
+        options = Options(; IPNewtons.default_options(method)...)
 
         xsol = [9.,12.]
         x0   = [12. 14.0]
         minval = NLSolversBase.value(df, xsol)
 
-        results = optimize(df,constraints, [12, 14.0], IPNewton(), options)
-        @test isa(summary(results), String)
-        @test IPNewtons.converged(results)
-        @test IPNewtons.minimum(results) < minval + sqrt(eps(minval))
+        results = optimize(df,constraints, [12, 14.0], method, options)
+        @test isa(Optim.summary(results), String)
+        @test Optim.converged(results)
+        @test Optim.minimum(results) < minval + sqrt(eps(minval))
     end
 end

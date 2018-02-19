@@ -1,5 +1,6 @@
 @testset "IPNewton Unconstrained" begin
-    run_optim_tests(IPNewton(); show_name=true, show_res=false, show_itcalls=true)
+    method = IPNewton()
+    run_optim_tests(method; show_name=true, show_res=false, show_itcalls=true)
 
     # prob = UP.examples["Rosenbrock"]
     # df = TwiceDifferentiable(UP.objective(prob), UP.gradient(prob),
@@ -8,9 +9,9 @@
     # infvec = fill(Inf, size(prob.initial_x))
     # constraints = TwiceDifferentiableConstraints(-infvec, infvec)
 
-    # options = OptimizationOptions(iterations = 1000, show_trace = false)
+    # options = Options(; IPNewtons.default_options(method)...)
 
-    # results = optimize(df,constraints,prob.initial_x, IPNewton(), options)
+    # results = optimize(df,constraints,prob.initial_x, method, options)
     # @test isa(summary(results), String)
     # @test IPNewtons.converged(results)
     # @test IPNewtons.minimum(results) < prob.minimum + sqrt(eps(typeof(prob.minimum)))

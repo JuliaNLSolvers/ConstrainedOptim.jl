@@ -1,4 +1,4 @@
-function trace!(tr, state, iteration, method::IPOptimizer, options)
+function trace!(tr, d, state, iteration, method::IPOptimizer, options)
     dt = Dict()
     dt["Lagrangian"] = state.L
     dt["μ"] = state.μ
@@ -16,9 +16,9 @@ function trace!(tr, state, iteration, method::IPOptimizer, options)
         end
     end
     g_norm = vecnorm(state.g, Inf) + vecnorm(state.bgrad, Inf)
-    update!(tr,
+    Optim.update!(tr,
             iteration,
-            state.f_x,
+            value(d),
             g_norm,
             dt,
             options.store_trace,

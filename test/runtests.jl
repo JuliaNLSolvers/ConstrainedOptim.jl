@@ -13,8 +13,7 @@ my_tests = [
     "counter.jl",
     "ipnewton_unconstrained.jl",
     "constraints.jl",
-]#"constrained.jl"]
-
+]
 
 function run_optim_tests(method; convergence_exceptions = (),
                          minimizer_exceptions = (),
@@ -40,7 +39,7 @@ function run_optim_tests(method; convergence_exceptions = (),
         iters = length(iter_id) == 0 ? 1000 : iteration_exceptions[iter_id[1]][2]
         # Construct options
         allow_f_increases = (name in f_increase_exceptions)
-        options = OptimizationOptions(iterations = iters, show_trace = show_trace)
+        options = Options(iterations = iters, show_trace = show_trace; IPNewtons.default_options(method)...)
 
         # Use finite difference if it is not differentiable enough
         if  !(name in skip) && prob.istwicedifferentiable
@@ -50,20 +49,20 @@ function run_optim_tests(method; convergence_exceptions = (),
             infvec = fill(Inf, size(prob.initial_x))
             constraints = TwiceDifferentiableConstraints(-infvec, infvec)
             results = optimize(df,constraints,prob.initial_x, method, options)
-            @test isa(summary(results), String)
+            @test isa(Optim.summary(results), String)
             show_res && println(results)
-            show_itcalls && print_with_color(:red, "Iterations: $(IPNewtons.iterations(results))\n")
-            show_itcalls && print_with_color(:red, "f-calls: $(IPNewtons.f_calls(results))\n")
-            show_itcalls && print_with_color(:red, "g-calls: $(IPNewtons.g_calls(results))\n")
-            show_itcalls && print_with_color(:red, "h-calls: $(IPNewtons.h_calls(results))\n")
+            show_itcalls && print_with_color(:red, "Iterations: $(Optim.iterations(results))\n")
+            show_itcalls && print_with_color(:red, "f-calls: $(Optim.f_calls(results))\n")
+            show_itcalls && print_with_color(:red, "g-calls: $(Optim.g_calls(results))\n")
+            show_itcalls && print_with_color(:red, "h-calls: $(Optim.h_calls(results))\n")
             if !(name in convergence_exceptions)
-                @test IPNewtons.converged(results)
+                @test Optim.converged(results)
             end
             if !(name in minimum_exceptions)
-                @test IPNewtons.minimum(results) < prob.minimum + sqrt(eps(typeof(prob.minimum)))
+                @test Optim.minimum(results) < prob.minimum + sqrt(eps(typeof(prob.minimum)))
             end
             if !(name in minimizer_exceptions)
-                @test vecnorm(IPNewtons.minimizer(results) - prob.solutions) < 1e-2
+                @test vecnorm(Optim.minimizer(results) - prob.solutions) < 1e-2
             end
         else
             debug_printing && print_with_color(:blue, "Skipping $name\n")

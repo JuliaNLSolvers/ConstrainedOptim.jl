@@ -9,13 +9,13 @@ module IPNewtons
 
     import NLSolversBase: iscomplex,  AbstractObjective, hessian, hessian!,
     nconstraints, nconstraints_x
-    import Optim: f_calls, g_calls, h_calls, OnceDifferentiable, TwiceDifferentiable
+    import Optim: f_calls, g_calls, h_calls, OnceDifferentiable, TwiceDifferentiable,
+    OptimizationState, OptimizationResults, OptimizationTrace, AbstractOptimizer,
+    MultivariateOptimizationResults, pick_best_x, pick_best_f, x_abschange,
+    f_abschange, g_residual, default_options, Options
 
-    import Base.length,
-           Base.push!,
-           Base.show,
-           Base.getindex,
-           Base.setindex!
+
+    import Base.show
 
     export optimize,
            isfeasible,
@@ -25,23 +25,12 @@ module IPNewtons
            TwiceDifferentiable,
            OnceDifferentiableConstraints,
            TwiceDifferentiableConstraints,
-           OptimizationOptions,
-           OptimizationState,
-           OptimizationTrace,
+           Options,
 
            IPNewton
 
     # Types
     include("types.jl")
-
-    # API
-    include("api.jl")
-
-    # Generic stuff
-    include("utilities/generic.jl")
-
-    # Maxdiff
-    include("utilities/maxdiff.jl")
 
     # Tracing
     include("utilities/update.jl")
@@ -50,9 +39,6 @@ module IPNewtons
     include("iplinesearch.jl")
     include("interior.jl")
     include("ipnewton.jl")
-
-    # End-User Facing Wrapper Functions
-   # include("optimize.jl")
 
     # Convergence
     include("utilities/assess_convergence.jl")
