@@ -1,18 +1,44 @@
 struct IPNewton{F,Tf<:Number,Tμ<:Union{Symbol,Number}} <: IPOptimizer{F}
     linesearch!::F
-    μfactor::Tf
-    μ0::Tμ
-    show_linesearch::Bool # TODO: This was originally in options
+    μ0::Tμ      # Initial value for the barrier penalty coefficient μ
+    show_linesearch::Bool
+    # TODO: μ0, and show_linesearch were originally in options
 end
 
 Base.summary(::IPNewton) = "Interior Point Newton"
 
 # TODO: Add support for InitialGuess from LineSearches
+"""
+# Interior-point Newton
+## Constructor
+```jl
+IPNewton(; linesearch::Function = ConstrainedOptim.backtrack_constrained_grad,
+         μ0::Union{Symbol,Number} = :auto,
+         show_linesearch::Bool = false)
+```
+
+The initial barrier penalty coefficient `μ0` can be chosen as a number, or set
+to `:auto` to let the algorithm decide its value, see `initialize_μ_λ!`.
+
+As of February 2018, the line search algorithm is specialised for constrained
+interior-point methods. In future we hope to support more algorithms from
+`LineSearches.jl`.
+
+## Description
+The `IPNewton` method implements an interior-point primal-dual Newton algorithm for solving
+nonlinear, constrained optimization problems. See Nocedal and Wright (Ch. 19, 2006) for a discussion of
+interior-point methods for constrained optimization.
+
+## References
+The algorithm was [originally written by Tim Holy](https://github.com/JuliaNLSolvers/Optim.jl/pull/303) (@timholy, tim.holy@gmail.com).
+
+ - J Nocedal, SJ Wright (2006), Numerical optimization, second edition. Springer.
+ - A Wächter, LT Biegler (2006), On the implementation of an interior-point filter line-search algorithm for large-scale nonlinear programming. Mathematical Programming 106 (1), 25-57.
+"""
 IPNewton(; linesearch::Function = backtrack_constrained_grad,
-         μfactor::Number = 0.1,
          μ0::Union{Symbol,Number} = :auto,
          show_linesearch::Bool = false) =
-  IPNewton(linesearch, μfactor, μ0, show_linesearch)
+  IPNewton(linesearch, μ0, show_linesearch)
 
 type IPNewtonState{T,Tx} <: AbstractBarrierState
     x::Tx
@@ -42,6 +68,7 @@ type IPNewtonState{T,Tx} <: AbstractBarrierState
 end
 summary(::IPNewtonState) = "Interior-point Newton's Method"
 
+# TODO: Do we need this convert thing? I don't have any tests to check that it works
 function Base.convert{T,Tx,S,Sx}(::Type{IPNewtonState{T,Tx}}, state::IPNewtonState{S, Sx})
     IPNewtonState(convert(Tx, state.x),
                   T(state.f_x),

@@ -363,7 +363,7 @@ function initialize_μ_λ!(state, bounds::ConstraintBounds, Hinfo, μ0::Union{Sy
     λE = Cc \ (JE*∇bI) + (cbar(bounds) - cE(state, bounds))/μ
     k = unpack_vec!(state.bstate.λxE, λE, 0)
     k = unpack_vec!(state.bstate.λcE, λE, k)
-    k == length(λE) || error("something is wrong")
+    k == length(λE) || error("Something is wrong when initializing μ and λ.")
     state
 end
 function initialize_μ_λ!(state, bounds::ConstraintBounds, μ0::Union{Number,Symbol}, β::Number=1//100)
@@ -862,11 +862,7 @@ function estimate_maxstep(αmax, x, s)
     αmax
 end
 
-function shrink_μ!(d, constraints, state, method, options)
-    state.μ *= method.μfactor
-    update_fg!(d, constraints, state, method)
-end
-
+# TODO: This is not used anymore??
 function qrregularize!(QRF)
     R = QRF[:R]
     for i = 1:size(R, 1)
