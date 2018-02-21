@@ -9,11 +9,11 @@
     # infvec = fill(Inf, size(prob.initial_x))
     # constraints = TwiceDifferentiableConstraints(-infvec, infvec)
 
-    # options = Options(; IPNewtons.default_options(method)...)
+    # options = Options(; ConstrainedOptim.default_options(method)...)
 
     # results = optimize(df,constraints,prob.initial_x, method, options)
     # @test isa(summary(results), String)
-    # @test IPNewtons.converged(results)
-    # @test IPNewtons.minimum(results) < prob.minimum + sqrt(eps(typeof(prob.minimum)))
-    # @test vecnorm(IPNewtons.minimizer(results) - prob.solutions) < 1e-2
+    # @test ConstrainedOptim.converged(results)
+    # @test ConstrainedOptim.minimum(results) < prob.minimum + sqrt(eps(typeof(prob.minimum)))
+    # @test vecnorm(ConstrainedOptim.minimizer(results) - prob.solutions) < 1e-2
 end

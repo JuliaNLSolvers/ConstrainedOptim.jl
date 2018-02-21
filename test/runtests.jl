@@ -2,7 +2,7 @@
 # Correctness Tests
 #
 
-using IPNewtons
+using ConstrainedOptim
 using Base.Test
 using Compat
 using OptimTestProblems
@@ -39,7 +39,7 @@ function run_optim_tests(method; convergence_exceptions = (),
         iters = length(iter_id) == 0 ? 1000 : iteration_exceptions[iter_id[1]][2]
         # Construct options
         allow_f_increases = (name in f_increase_exceptions)
-        options = Options(iterations = iters, show_trace = show_trace; IPNewtons.default_options(method)...)
+        options = Options(iterations = iters, show_trace = show_trace; ConstrainedOptim.default_options(method)...)
 
         # Use finite difference if it is not differentiable enough
         if  !(name in skip) && prob.istwicedifferentiable

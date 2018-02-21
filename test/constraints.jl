@@ -1,15 +1,15 @@
-using IPNewtons, PositiveFactorizations
+using ConstrainedOptim, PositiveFactorizations
 
 @testset "Constraints" begin
     # Utility function for hand-setting the μ parameter
     function setstate!(state, μ, d, constraints, method)
         state.μ = μ
-        IPNewtons.update_fg!(d, constraints, state, method)
-        IPNewtons.update_h!(d, constraints, state, method)
+        ConstrainedOptim.update_fg!(d, constraints, state, method)
+        ConstrainedOptim.update_h!(d, constraints, state, method)
     end
 
     @testset "Bounds parsing" begin
-        b = IPNewtons.ConstraintBounds([0.0, 0.5, 2.0], [1.0, 1.0, 2.0], [5.0, 3.8], [5.0, 4.0])
+        b = ConstrainedOptim.ConstraintBounds([0.0, 0.5, 2.0], [1.0, 1.0, 2.0], [5.0, 3.8], [5.0, 4.0])
         @test b.eqx == [3]
         @test b.valx == [2.0]
         @test b.ineqx == [1,1,2,2]
@@ -24,7 +24,7 @@ using IPNewtons, PositiveFactorizations
         show(io, b)
         @test String(take!(io)) == "ConstraintBounds:\n  Variables:\n    x[3]=2.0\n    x[1]≥0.0, x[1]≤1.0, x[2]≥0.5, x[2]≤1.0\n  Linear/nonlinear constraints:\n    c_1=5.0\n    c_2≥3.8, c_2≤4.0"
 
-        b = IPNewtons.ConstraintBounds(Float64[], Float64[], [5.0, 3.8], [5.0, 4.0])
+        b = ConstrainedOptim.ConstraintBounds(Float64[], Float64[], [5.0, 3.8], [5.0, 4.0])
         for fn in (:eqx, :valx, :ineqx, :σx, :bx)
             @test isempty(getfield(b, fn))
         end
@@ -34,11 +34,11 @@ using IPNewtons, PositiveFactorizations
         @test b.σc == [1,-1]
         @test b.bc == [3.8,4.0]
 
-        ba = IPNewtons.ConstraintBounds([], [], [5.0, 3.8], [5.0, 4.0])
+        ba = ConstrainedOptim.ConstraintBounds([], [], [5.0, 3.8], [5.0, 4.0])
         @test eltype(ba) == Float64
 
-        @test_throws ArgumentError IPNewtons.ConstraintBounds([0.0, 0.5, 2.0], [1.0, 1.0, 2.0], [5.0, 4.8], [5.0, 4.0])
-        @test_throws DimensionMismatch IPNewtons.ConstraintBounds([0.0, 0.5, 2.0], [1.0, 1.0], [5.0, 4.8], [5.0, 4.0])
+        @test_throws ArgumentError ConstrainedOptim.ConstraintBounds([0.0, 0.5, 2.0], [1.0, 1.0, 2.0], [5.0, 4.8], [5.0, 4.0])
+        @test_throws DimensionMismatch ConstrainedOptim.ConstraintBounds([0.0, 0.5, 2.0], [1.0, 1.0], [5.0, 4.8], [5.0, 4.0])
     end
 
     @testset "IPNewton computations" begin
@@ -46,16 +46,16 @@ using IPNewtons, PositiveFactorizations
         function check_autodiff(d, bounds, x, cfun::Function, bstate, μ)
             c = cfun(x)
             J = ForwardDiff.jacobian(cfun, x)
-            p = IPNewtons.pack_vec(x, bstate)
-            ftot! = (storage, p)->IPNewtons.lagrangian_fgvec!(p, storage, gx, bgrad, d, bounds, x, c, J, bstate, μ)
+            p = ConstrainedOptim.pack_vec(x, bstate)
+            ftot! = (storage, p)->ConstrainedOptim.lagrangian_fgvec!(p, storage, gx, bgrad, d, bounds, x, c, J, bstate, μ)
             pgrad = similar(p)
             ftot!(pgrad, p)
             chunksize = min(8, length(p))
             TD = ForwardDiff.Dual{ForwardDiff.Tag{Void,Float64},eltype(p),chunksize}
             xd = similar(x, TD)
-            bstated = IPNewtons.BarrierStateVars{TD}(bounds)
+            bstated = ConstrainedOptim.BarrierStateVars{TD}(bounds)
             pcmp = similar(p)
-            ftot = p->IPNewtons.lagrangian_vec(p, d, bounds, xd, cfun, bstated, μ)
+            ftot = p->ConstrainedOptim.lagrangian_vec(p, d, bounds, xd, cfun, bstated, μ)
             #ForwardDiff.gradient!(pcmp, ftot, p, ForwardDiff.{chunksize}())
             ForwardDiff.gradient!(pcmp, ftot, p)
             @test pcmp ≈ pgrad
@@ -70,8 +70,8 @@ using IPNewtons, PositiveFactorizations
         cfun = x->Float64[]
         c = Float64[]
         J = Array{Float64}(0,0)
-        method = IPNewtons.IPNewton(μ0 = μ)
-        options = Options(; IPNewtons.default_options(method)...)
+        method = ConstrainedOptim.IPNewton(μ0 = μ)
+        options = Options(; ConstrainedOptim.default_options(method)...)
         ## In the code, variable constraints are special-cased (for
         ## reasons of user-convenience and efficiency).  It's
         ## important to check that the special-casing yields the same
@@ -83,24 +83,24 @@ using IPNewtons, PositiveFactorizations
         cvarh! = (h, x, λ) -> h  # h! adds to h, it doesn't replace it
 
         ## No constraints
-        bounds = IPNewtons.ConstraintBounds(Float64[], Float64[], Float64[], Float64[])
-        bstate = IPNewtons.BarrierStateVars(bounds, x)
+        bounds = ConstrainedOptim.ConstraintBounds(Float64[], Float64[], Float64[], Float64[])
+        bstate = ConstrainedOptim.BarrierStateVars(bounds, x)
         bgrad = similar(bstate)
-        f_x, L = IPNewtons.lagrangian_fg!(gx, bgrad, dg, bounds, x, Float64[], Array{Float64}(0,0), bstate, μ)
+        f_x, L = ConstrainedOptim.lagrangian_fg!(gx, bgrad, dg, bounds, x, Float64[], Array{Float64}(0,0), bstate, μ)
         @test f_x == L == dg.f(x)
         @test gx == H*x
         constraints = TwiceDifferentiableConstraints(
             (c,x)->nothing, (J,x)->nothing, (H,x,λ)->nothing, bounds)
-        state = IPNewtons.initial_state(method, options, dg, constraints, x)
-        @test IPNewtons.gf(bounds, state) ≈ gx
-        @test IPNewtons.Hf(constraints, state) ≈ H
+        state = ConstrainedOptim.initial_state(method, options, dg, constraints, x)
+        @test ConstrainedOptim.gf(bounds, state) ≈ gx
+        @test ConstrainedOptim.Hf(constraints, state) ≈ H
         ## Pure equality constraints on variables
         xbar = fill(0.2, length(x))
-        bounds = IPNewtons.ConstraintBounds(xbar, xbar, [], [])
-        bstate = IPNewtons.BarrierStateVars(bounds)
+        bounds = ConstrainedOptim.ConstraintBounds(xbar, xbar, [], [])
+        bstate = ConstrainedOptim.BarrierStateVars(bounds)
         rand!(bstate.λxE)
         bgrad = similar(bstate)
-        f_x, L = IPNewtons.lagrangian_fg!(gx, bgrad, d0, bounds, x, c, J, bstate, μ)
+        f_x, L = ConstrainedOptim.lagrangian_fg!(gx, bgrad, d0, bounds, x, c, J, bstate, μ)
         @test f_x == 0
         @test L ≈ dot(bstate.λxE, xbar-x)
         @test gx == -bstate.λxE
@@ -114,28 +114,28 @@ using IPNewtons, PositiveFactorizations
 
         constraints = TwiceDifferentiableConstraints(
             (c,x)->nothing, (J,x)->nothing, (H,x,λ)->nothing, bounds)
-        state = IPNewtons.initial_state(method, options, d0, constraints, x)
+        state = ConstrainedOptim.initial_state(method, options, d0, constraints, x)
         copy!(state.bstate.λxE, bstate.λxE)
         setstate!(state, μ, d0, constraints, method)
-        @test IPNewtons.gf(bounds, state) ≈ [gx; xbar-x]
+        @test ConstrainedOptim.gf(bounds, state) ≈ [gx; xbar-x]
         n = length(x)
-        @test IPNewtons.Hf(constraints, state) ≈ [eye(n,n) -eye(n,n); -eye(n,n) zeros(n,n)]
+        @test ConstrainedOptim.Hf(constraints, state) ≈ [eye(n,n) -eye(n,n); -eye(n,n) zeros(n,n)]
         # Now again using the generic machinery
-        bounds = IPNewtons.ConstraintBounds([], [], xbar, xbar)
+        bounds = ConstrainedOptim.ConstraintBounds([], [], xbar, xbar)
         constraints = TwiceDifferentiableConstraints(cvar!, cvarJ!, cvarh!, bounds)
-        state = IPNewtons.initial_state(method, options, d0, constraints, x)
+        state = ConstrainedOptim.initial_state(method, options, d0, constraints, x)
         copy!(state.bstate.λcE, bstate.λxE)
         setstate!(state, μ, d0, constraints, method)
-        @test IPNewtons.gf(bounds, state) ≈ [gx; xbar-x]
+        @test ConstrainedOptim.gf(bounds, state) ≈ [gx; xbar-x]
         n = length(x)
-        @test IPNewtons.Hf(constraints, state) ≈ [eye(n,n) -eye(n,n); -eye(n,n) zeros(n,n)]
+        @test ConstrainedOptim.Hf(constraints, state) ≈ [eye(n,n) -eye(n,n); -eye(n,n) zeros(n,n)]
         ## Nonnegativity constraints
-        bounds = IPNewtons.ConstraintBounds(zeros(length(x)), fill(Inf,length(x)), [], [])
+        bounds = ConstrainedOptim.ConstraintBounds(zeros(length(x)), fill(Inf,length(x)), [], [])
         y = rand(length(x))
-        bstate = IPNewtons.BarrierStateVars(bounds, y)
+        bstate = ConstrainedOptim.BarrierStateVars(bounds, y)
         rand!(bstate.λx)
         bgrad = similar(bstate)
-        f_x, L = IPNewtons.lagrangian_fg!(gx, bgrad, d0, bounds, y, Float64[], Array{Float64}(0,0), bstate, μ)
+        f_x, L = ConstrainedOptim.lagrangian_fg!(gx, bgrad, d0, bounds, y, Float64[], Array{Float64}(0,0), bstate, μ)
         @test f_x == 0
         @test L ≈ -μ*sum(log, y)
         @test bgrad.slack_x == -μ./y + bstate.λx
@@ -144,25 +144,25 @@ using IPNewtons, PositiveFactorizations
         #check_autodiff(d0, bounds, y, cfun, bstate, μ)
         constraints = TwiceDifferentiableConstraints(
             (c,x)->nothing, (J,x)->nothing, (H,x,λ)->nothing, bounds)
-        state = IPNewtons.initial_state(method, options, d0, constraints, y)
+        state = ConstrainedOptim.initial_state(method, options, d0, constraints, y)
         setstate!(state, μ, d0, constraints, method)
-        @test IPNewtons.gf(bounds, state) ≈ -μ./y
-        @test IPNewtons.Hf(constraints, state) ≈ μ*Diagonal(1./y.^2)
+        @test ConstrainedOptim.gf(bounds, state) ≈ -μ./y
+        @test ConstrainedOptim.Hf(constraints, state) ≈ μ*Diagonal(1./y.^2)
         # Now again using the generic machinery
-        bounds = IPNewtons.ConstraintBounds([], [], zeros(length(x)), fill(Inf,length(x)))
+        bounds = ConstrainedOptim.ConstraintBounds([], [], zeros(length(x)), fill(Inf,length(x)))
         constraints = TwiceDifferentiableConstraints(cvar!, cvarJ!, cvarh!, bounds)
-        state = IPNewtons.initial_state(method, options, d0, constraints, y)
+        state = ConstrainedOptim.initial_state(method, options, d0, constraints, y)
         setstate!(state, μ, d0, constraints, method)
-        @test IPNewtons.gf(bounds, state) ≈ -μ./y
-        @test IPNewtons.Hf(constraints, state) ≈ μ*Diagonal(1./y.^2)
+        @test ConstrainedOptim.gf(bounds, state) ≈ -μ./y
+        @test ConstrainedOptim.Hf(constraints, state) ≈ μ*Diagonal(1./y.^2)
         ## General inequality constraints on variables
         lb, ub = rand(length(x))-2, rand(length(x))+1
-        bounds = IPNewtons.ConstraintBounds(lb, ub, [], [])
-        bstate = IPNewtons.BarrierStateVars(bounds, x)
+        bounds = ConstrainedOptim.ConstraintBounds(lb, ub, [], [])
+        bstate = ConstrainedOptim.BarrierStateVars(bounds, x)
         rand!(bstate.slack_x)  # intentionally displace from the correct value
         rand!(bstate.λx)
         bgrad = similar(bstate)
-        f_x, L = IPNewtons.lagrangian_fg!(gx, bgrad, d0, bounds, x, Float64[], Array{Float64}(0,0), bstate, μ)
+        f_x, L = ConstrainedOptim.lagrangian_fg!(gx, bgrad, d0, bounds, x, Float64[], Array{Float64}(0,0), bstate, μ)
         @test f_x == 0
         s = bounds.σx .* (x[bounds.ineqx] - bounds.bx)
         Ltarget = -μ*sum(log, bstate.slack_x) +
@@ -178,7 +178,7 @@ using IPNewtons, PositiveFactorizations
         #check_autodiff(d0, bounds, x, cfun, bstate, μ)
         constraints = TwiceDifferentiableConstraints(
             (c,x)->nothing, (J,x)->nothing, (H,x,λ)->nothing, bounds)
-        state = IPNewtons.initial_state(method, options, d0, constraints, x)
+        state = ConstrainedOptim.initial_state(method, options, d0, constraints, x)
         copy!(state.bstate.slack_x, bstate.slack_x)
         copy!(state.bstate.λx, bstate.λx)
         setstate!(state, μ, d0, constraints, method)
@@ -194,17 +194,17 @@ using IPNewtons, PositiveFactorizations
             hxs[j] += htmp
             gxs[j] += bounds.σx[i]*(gstmp - λ[i]) - bounds.σx[i]*htmp*gλtmp
         end
-        @test IPNewtons.gf(bounds, state) ≈ gxs
-        @test IPNewtons.Hf(constraints, state) ≈ Diagonal(hxs)
+        @test ConstrainedOptim.gf(bounds, state) ≈ gxs
+        @test ConstrainedOptim.Hf(constraints, state) ≈ Diagonal(hxs)
         # Now again using the generic machinery
-        bounds = IPNewtons.ConstraintBounds([], [], lb, ub)
+        bounds = ConstrainedOptim.ConstraintBounds([], [], lb, ub)
         constraints = TwiceDifferentiableConstraints(cvar!, cvarJ!, cvarh!, bounds)
-        state = IPNewtons.initial_state(method, options, d0, constraints, x)
+        state = ConstrainedOptim.initial_state(method, options, d0, constraints, x)
         copy!(state.bstate.slack_c, bstate.slack_x)
         copy!(state.bstate.λc, bstate.λx)
         setstate!(state, μ, d0, constraints, method)
-        @test IPNewtons.gf(bounds, state) ≈ gxs
-        @test IPNewtons.Hf(constraints, state) ≈ Diagonal(hxs)
+        @test ConstrainedOptim.gf(bounds, state) ≈ gxs
+        @test ConstrainedOptim.Hf(constraints, state) ≈ Diagonal(hxs)
         ## Nonlinear equality constraints
         cfun = x->[x[1]^2+x[2]^2, x[2]*x[3]^2]
         cfun! = (c, x) -> copy!(c, cfun(x))
@@ -219,11 +219,11 @@ using IPNewtons, PositiveFactorizations
         J = ForwardDiff.jacobian(cfun, x)
         Jtmp = similar(J); @test cJ!(Jtmp, x) ≈ J  # just to check we did it right
         cbar = rand(length(c))
-        bounds = IPNewtons.ConstraintBounds([], [], cbar, cbar)
-        bstate = IPNewtons.BarrierStateVars(bounds, x, c)
+        bounds = ConstrainedOptim.ConstraintBounds([], [], cbar, cbar)
+        bstate = ConstrainedOptim.BarrierStateVars(bounds, x, c)
         rand!(bstate.λcE)
         bgrad = similar(bstate)
-        f_x, L = IPNewtons.lagrangian_fg!(gx, bgrad, d0, bounds, x, c, J, bstate, μ)
+        f_x, L = ConstrainedOptim.lagrangian_fg!(gx, bgrad, d0, bounds, x, c, J, bstate, μ)
         @test f_x == 0
         @test L ≈ dot(bstate.λcE, cbar-c)
         @test gx ≈ -J'*bstate.λcE
@@ -231,21 +231,21 @@ using IPNewtons, PositiveFactorizations
         # TODO: Fix autodiff check
         #check_autodiff(d0, bounds, x, cfun, bstate, μ)
         constraints = TwiceDifferentiableConstraints(cfun!, cJ!, ch!, bounds)
-        state = IPNewtons.initial_state(method, options, d0, constraints, x)
+        state = ConstrainedOptim.initial_state(method, options, d0, constraints, x)
         copy!(state.bstate.λcE, bstate.λcE)
         setstate!(state, μ, d0, constraints, method)
         heq = zeros(length(x), length(x))
         ch!(heq, x, bstate.λcE)
-        @test IPNewtons.gf(bounds, state) ≈ [gx; cbar-c]
-        @test IPNewtons.Hf(constraints, state) ≈ [full(cholfact(Positive, heq)) -J';
+        @test ConstrainedOptim.gf(bounds, state) ≈ [gx; cbar-c]
+        @test ConstrainedOptim.Hf(constraints, state) ≈ [full(cholfact(Positive, heq)) -J';
                                                   -J zeros(size(J,1), size(J,1))]
         ## Nonlinear inequality constraints
-        bounds = IPNewtons.ConstraintBounds([], [], -rand(length(c))-1, rand(length(c))+2)
-        bstate = IPNewtons.BarrierStateVars(bounds, x, c)
+        bounds = ConstrainedOptim.ConstraintBounds([], [], -rand(length(c))-1, rand(length(c))+2)
+        bstate = ConstrainedOptim.BarrierStateVars(bounds, x, c)
         rand!(bstate.slack_c)  # intentionally displace from the correct value
         rand!(bstate.λc)
         bgrad = similar(bstate)
-        f_x, L = IPNewtons.lagrangian_fg!(gx, bgrad, d0, bounds, x, c, J, bstate, μ)
+        f_x, L = ConstrainedOptim.lagrangian_fg!(gx, bgrad, d0, bounds, x, c, J, bstate, μ)
         @test f_x == 0
         Ltarget = -μ*sum(log, bstate.slack_c) +
             dot(bstate.λc, bstate.slack_c - bounds.σc.*(c[bounds.ineqc]-bounds.bc))
@@ -256,7 +256,7 @@ using IPNewtons, PositiveFactorizations
         # TODO: Fix autodiff check
         #check_autodiff(d0, bounds, x, cfun, bstate, μ)
         constraints = TwiceDifferentiableConstraints(cfun!, cJ!, ch!, bounds)
-        state = IPNewtons.initial_state(method, options, d0, constraints, x)
+        state = ConstrainedOptim.initial_state(method, options, d0, constraints, x)
         copy!(state.bstate.slack_c, bstate.slack_c)
         copy!(state.bstate.λc, bstate.λc)
         setstate!(state, μ, d0, constraints, method)
@@ -274,21 +274,21 @@ using IPNewtons, PositiveFactorizations
         #        hxx = full(cholfact(Positive, -hineq)) + JI'*Diagonal(bstate.λc./bstate.slack_c)*JI
         hxx = -hineq + JI'*Diagonal(bstate.λc./bstate.slack_c)*JI
         gf = -JI'*(bounds.σc .* bstate.λc) + JI'*Diagonal(bounds.σc)*(bgrad.slack_c - (bgrad.λc .* bstate.λc ./ bstate.slack_c))
-        @test IPNewtons.gf(bounds, state) ≈ gf
-        @test IPNewtons.Hf(constraints, state) ≈ full(cholfact(Positive, hxx, Val{true}))
+        @test ConstrainedOptim.gf(bounds, state) ≈ gf
+        @test ConstrainedOptim.Hf(constraints, state) ≈ full(cholfact(Positive, hxx, Val{true}))
     end
 
     @testset "IPNewton initialization" begin
         method = IPNewton()
-        options = Options(; IPNewtons.default_options(method)...)
+        options = Options(; ConstrainedOptim.default_options(method)...)
         x = [1.0,0.1,0.3,0.4]
         ## A linear objective function (hessian is zero)
         f_g = [1.0,2.0,3.0,4.0]
         d = TwiceDifferentiable(x->dot(x, f_g), (g,x)->copy!(g, f_g), (h,x)->fill!(h, 0), x)
         # Variable bounds
         constraints = TwiceDifferentiableConstraints([0.5, 0.0, -Inf, -Inf], [Inf, Inf, 1.0, 0.8])
-        state = IPNewtons.initial_state(method, options, d, constraints, x)
-        IPNewtons.update_fg!(d, constraints, state, method)
+        state = ConstrainedOptim.initial_state(method, options, d, constraints, x)
+        ConstrainedOptim.update_fg!(d, constraints, state, method)
         @test norm(f_g - state.g) ≈ 0.01*norm(f_g)
         # Nonlinear inequalities
         constraints = TwiceDifferentiableConstraints(
@@ -297,8 +297,8 @@ using IPNewtons, PositiveFactorizations
             (h,x,λ)->(h[4,4] += λ[2]*2),
             [], [], [0.05, 0.4], [0.15, 4.4])
         @test isinterior(constraints, x)
-        state = IPNewtons.initial_state(method, options, d, constraints, x)
-        IPNewtons.update_fg!(d, constraints, state, method)
+        state = ConstrainedOptim.initial_state(method, options, d, constraints, x)
+        ConstrainedOptim.update_fg!(d, constraints, state, method)
         @test norm(f_g - state.g) ≈ 0.01*norm(f_g)
         # Mixed equalities and inequalities
         constraints = TwiceDifferentiableConstraints(
@@ -307,8 +307,8 @@ using IPNewtons, PositiveFactorizations
             (h,x,λ)->(h[4,4] += λ[2]*2),
             [], [], [0.1, 0.4], [0.1, 4.4])
         @test isfeasible(constraints, x)
-        state = IPNewtons.initial_state(method, options, d, constraints, x)
-        IPNewtons.update_fg!(d, constraints, state, method)
+        state = ConstrainedOptim.initial_state(method, options, d, constraints, x)
+        ConstrainedOptim.update_fg!(d, constraints, state, method)
         J = zeros(2,4)
         constraints.jacobian!(J, x)
         eqnormal = vec(J[1,:]); eqnormal = eqnormal/norm(eqnormal)
@@ -324,10 +324,10 @@ using IPNewtons, PositiveFactorizations
         hx = Diagonal(hd)
         # Variable bounds
         constraints = TwiceDifferentiableConstraints([0.5, 0.0, -Inf, -Inf], [Inf, Inf, 1.0, 0.8])
-        state = IPNewtons.initial_state(method, options, d, constraints, x)
-        IPNewtons.update_fg!(d, constraints, state, method)
+        state = ConstrainedOptim.initial_state(method, options, d, constraints, x)
+        ConstrainedOptim.update_fg!(d, constraints, state, method)
         @test abs(dot(gx, state.g)/dot(gx,gx) - 1) <= 0.011
-        IPNewtons.update_h!(d, constraints, state, method)
+        ConstrainedOptim.update_h!(d, constraints, state, method)
         @test abs(dot(gx, state.H*gx)/dot(gx, hx*gx) - 1) <= 0.011
         # Nonlinear inequalities
         constraints = TwiceDifferentiableConstraints(
@@ -336,10 +336,10 @@ using IPNewtons, PositiveFactorizations
             (h,x,λ)->(h[4,4] += λ[2]*2),
             [], [], [0.05, 0.4], [0.15, 4.4])
         @test isinterior(constraints, x)
-        state = IPNewtons.initial_state(method, options, d, constraints, x)
-        IPNewtons.update_fg!(d, constraints, state, method)
+        state = ConstrainedOptim.initial_state(method, options, d, constraints, x)
+        ConstrainedOptim.update_fg!(d, constraints, state, method)
         @test abs(dot(gx, state.g)/dot(gx,gx) - 1) <= 0.011
-        IPNewtons.update_h!(d, constraints, state, method)
+        ConstrainedOptim.update_h!(d, constraints, state, method)
         @test abs(dot(gx, state.H*gx)/dot(gx, hx*gx) - 1) <= 0.011
         # Mixed equalities and inequalities
         constraints = TwiceDifferentiableConstraints(
@@ -348,23 +348,23 @@ using IPNewtons, PositiveFactorizations
             (h,x,λ)->(h[4,4] += λ[2]*2),
             [], [], [0.1, 0.4], [0.1, 4.4])
         @test isfeasible(constraints, x)
-        state = IPNewtons.initial_state(method, options, d, constraints, x)
-        IPNewtons.update_fg!(d, constraints, state, method)
+        state = ConstrainedOptim.initial_state(method, options, d, constraints, x)
+        ConstrainedOptim.update_fg!(d, constraints, state, method)
         J = zeros(2,4)
         constraints.jacobian!(J, x)
         eqnormal = vec(J[1,:]); eqnormal = eqnormal/norm(eqnormal)
         @test abs(dot(state.g, eqnormal)) < 1e-12  # orthogonal to equality constraint
         Pgx = gx - dot(gx, eqnormal)*eqnormal
         @test abs(dot(Pgx, state.g)/dot(Pgx,Pgx) - 1) <= 0.011
-        IPNewtons.update_h!(d, constraints, state, method)
+        ConstrainedOptim.update_h!(d, constraints, state, method)
         @test abs(dot(Pgx, state.H*Pgx)/dot(Pgx, hx*Pgx) - 1) <= 0.011
     end
 
     @testset "IPNewton step" begin
         function autoqp(d, constraints, state)
             # Note that state must be fully up-to-date, and you must
-            # have also called IPNewtons.solve_step!
-            p = IPNewtons.pack_vec(state.x, state.bstate)
+            # have also called ConstrainedOptim.solve_step!
+            p = ConstrainedOptim.pack_vec(state.x, state.bstate)
             chunksize = 1 #min(8, length(p))
 
             # TODO: How do we deal with the new Tags in ForwardDiff?
@@ -376,13 +376,13 @@ using IPNewtons, PositiveFactorizations
             # TD2 = ForwardDiff.Dual{chunksize, ForwardDiff.Dual{chunksize, eltype(p)}}
             # TD2 = ForwardDiff.Dual{ForwardDiff.Tag{Void,Float64}, typeof(TD), chunksize}
             Tx = typeof(state.x)
-            stated = convert(IPNewtons.IPNewtonState{TD, Tx,1}, state)
+            stated = convert(ConstrainedOptim.IPNewtonState{TD, Tx,1}, state)
             # TODO: Uncomment
-            #stated2 = convert(IPNewtons.IPNewtonState{TD2, Tx, 1}, state)
+            #stated2 = convert(ConstrainedOptim.IPNewtonState{TD2, Tx, 1}, state)
 
-            ϕd = αs->IPNewtons.lagrangian_linefunc(αs, d, constraints, stated)
+            ϕd = αs->ConstrainedOptim.lagrangian_linefunc(αs, d, constraints, stated)
             # TODO: Uncomment
-            #ϕd2 = αs->IPNewtons.lagrangian_linefunc(αs, d, constraints, stated2)
+            #ϕd2 = αs->ConstrainedOptim.lagrangian_linefunc(αs, d, constraints, stated2)
 
             #ForwardDiff.gradient(ϕd, zeros(4)), ForwardDiff.hessian(ϕd2, zeros(4))
             ForwardDiff.gradient(ϕd, [0.0])#, ForwardDiff.hessian(ϕd2, [0.0])
@@ -390,13 +390,13 @@ using IPNewtons, PositiveFactorizations
         F = 1000
         d = TwiceDifferentiable(x->F*x[1], (g, x) -> (g[1] = F), (h, x) -> (h[1,1] = 0), [0.0,])
         μ = 1e-20
-        method = IPNewtons.IPNewton(μ0=μ)
-        options = Options(; IPNewtons.default_options(method)...)
+        method = ConstrainedOptim.IPNewton(μ0=μ)
+        options = Options(; ConstrainedOptim.default_options(method)...)
         x0 = μ/F*10  # minimum is at μ/F
         # Nonnegativity (the case that doesn't require slack variables)
         constraints = TwiceDifferentiableConstraints([0.0], [])
-        state = IPNewtons.initial_state(method, options, d, constraints, [x0])
-        qp = IPNewtons.solve_step!(state, constraints, options)
+        state = ConstrainedOptim.initial_state(method, options, d, constraints, [x0])
+        qp = ConstrainedOptim.solve_step!(state, constraints, options)
         @test state.s[1] ≈ -(F-μ/x0)/(state.bstate.λx[1]/x0)
         # TODO: Fix ForwardDiff
         #g0, H0 = autoqp(d, constraints, state)
@@ -407,9 +407,9 @@ using IPNewtons, PositiveFactorizations
         # TODO: Fix ForwardDiff
         #@test [qp[3]] ≈ H0 # μ/x0^2*(x0 - F*x0^2/μ)^2
         bstate, bstep, bounds = state.bstate, state.bstep, constraints.bounds
-        αmax = IPNewtons.estimate_maxstep(Inf, state.x[bounds.ineqx].*bounds.σx,
+        αmax = ConstrainedOptim.estimate_maxstep(Inf, state.x[bounds.ineqx].*bounds.σx,
                                           state.s[bounds.ineqx].*bounds.σx)
-        ϕ = IPNewtons.linesearch_anon(d, constraints, state, method)
+        ϕ = ConstrainedOptim.linesearch_anon(d, constraints, state, method)
         val0 = ϕ(0.0)
         val0 = isa(val0, Tuple) ? val0[1] : val0
         @test val0 ≈ qp[1]
@@ -430,30 +430,30 @@ using IPNewtons, PositiveFactorizations
         # boundary).
         F0 = 1000
         μ = 1e-20   # smaller than eps(1.0)
-        method = IPNewtons.IPNewton(μ0=μ)
-        options = Options(; IPNewtons.default_options(method)...)
+        method = ConstrainedOptim.IPNewton(μ0=μ)
+        options = Options(; ConstrainedOptim.default_options(method)...)
         for σ in (1, -1)
             F = σ*F0
             # Nonnegativity/nonpositivity (the case that doesn't require slack variables)
             d = TwiceDifferentiable(x->F*x[1], (g, x) -> (g[1] = F), (h, x) -> (h[1,1] = 0), [0.0,])
             constraints = TwiceDifferentiableConstraints(σswap(σ, [0.0], [])...)
-            state = IPNewtons.initial_state(method, options, d, constraints, [μ/F*10])
+            state = ConstrainedOptim.initial_state(method, options, d, constraints, [μ/F*10])
             for i = 1:10
-                IPNewtons.update_state!(d, constraints, state, method, options)
+                ConstrainedOptim.update_state!(d, constraints, state, method, options)
                 state.μ = μ
-                IPNewtons.update_fg!(d, constraints, state, method)
-                IPNewtons.update_h!(d, constraints, state, method)
+                ConstrainedOptim.update_fg!(d, constraints, state, method)
+                ConstrainedOptim.update_h!(d, constraints, state, method)
             end
             @test isapprox(first(state.x), μ/F, rtol=1e-4)
             # |x| ≥ 1, and check that we get slack precision better than eps(1.0)
             d = TwiceDifferentiable(x->F*(x[1]-σ), (g, x) -> (g[1] = F), (h, x) -> (h[1,1] = 0), [0.0,])
             constraints = TwiceDifferentiableConstraints(σswap(σ, [Float64(σ)], [])...)
-            state = IPNewtons.initial_state(method, options, d, constraints, [(1+eps(1.0))*σ])
+            state = ConstrainedOptim.initial_state(method, options, d, constraints, [(1+eps(1.0))*σ])
             for i = 1:10
-                IPNewtons.update_state!(d, constraints, state, method, options)
+                ConstrainedOptim.update_state!(d, constraints, state, method, options)
                 state.μ = μ
-                IPNewtons.update_fg!(d, constraints, state, method)
-                IPNewtons.update_h!(d, constraints, state, method)
+                ConstrainedOptim.update_fg!(d, constraints, state, method)
+                ConstrainedOptim.update_h!(d, constraints, state, method)
             end
             @test state.x[1] == σ
             @test state.bstate.slack_x[1] < eps(float(σ))
@@ -464,11 +464,11 @@ using IPNewtons, PositiveFactorizations
                 (J,x)->(J[1,1] = 1.0),
                 (h,x,λ)->nothing,
                 [], [], σswap(σ, [Float64(σ)], [])...)
-            state = IPNewtons.initial_state(method, options, d, constraints, [(1+eps(1.0))*σ])
+            state = ConstrainedOptim.initial_state(method, options, d, constraints, [(1+eps(1.0))*σ])
             for i = 1:10
-                IPNewtons.update_state!(d, constraints, state, method, options)
-                IPNewtons.update_fg!(d, constraints, state, method)
-                IPNewtons.update_h!(d, constraints, state, method)
+                ConstrainedOptim.update_state!(d, constraints, state, method, options)
+                ConstrainedOptim.update_fg!(d, constraints, state, method)
+                ConstrainedOptim.update_h!(d, constraints, state, method)
             end
             @test state.x[1] ≈ σ
             @test state.bstate.slack_c[1] < eps(float(σ))
@@ -490,7 +490,7 @@ using IPNewtons, PositiveFactorizations
                 cd.c!, cd.jacobian!, cd.h!,
                 cd.lx, cd.ux, cd.lc, cd.uc)
 
-            options = Options(; IPNewtons.default_options(method)...)
+            options = Options(; ConstrainedOptim.default_options(method)...)
 
             minval = NLSolversBase.value(df, prob.solutions)
 
@@ -516,7 +516,7 @@ using IPNewtons, PositiveFactorizations
             cd.c!, cd.jacobian!, cd.h!,
             lx, ux, cd.lc, cd.uc)
 
-        options = Options(; IPNewtons.default_options(method)...)
+        options = Options(; ConstrainedOptim.default_options(method)...)
 
         xsol = [9.,12.]
         x0   = [12. 14.0]

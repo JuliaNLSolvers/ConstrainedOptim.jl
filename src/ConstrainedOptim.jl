@@ -1,6 +1,6 @@
 __precompile__(true)
 
-module IPNewtons
+module ConstrainedOptim
     using PositiveFactorizations
     using ForwardDiff
     using NLSolversBase, LineSearches

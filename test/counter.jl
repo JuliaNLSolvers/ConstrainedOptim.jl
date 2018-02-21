@@ -47,10 +47,10 @@
         MVP.hessian(prob)(out, x)
     end
 
-    options = Options(; IPNewtons.default_options(IPNewton())...)
+    options = Options(; ConstrainedOptim.default_options(IPNewton())...)
     # TODO: Run this on backtrack_constrained as well (when we figure out what it does)
-    for ls in [IPNewtons.backtrack_constrained_grad,]
-               #IPNewtons.backtrack_constrained]
+    for ls in [ConstrainedOptim.backtrack_constrained_grad,]
+               #ConstrainedOptim.backtrack_constrained]
 
         fcounter(true); gcounter(true); hcounter(true)
 
