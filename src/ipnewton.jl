@@ -1,4 +1,4 @@
-struct IPNewton{F,Tf<:Number,Tμ<:Union{Symbol,Number}} <: IPOptimizer{F}
+struct IPNewton{F,Tμ<:Union{Symbol,Number}} <: IPOptimizer{F}
     linesearch!::F
     μ0::Tμ      # Initial value for the barrier penalty coefficient μ
     show_linesearch::Bool
