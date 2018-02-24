@@ -526,5 +526,7 @@ using ConstrainedOptim, PositiveFactorizations
         @test isa(Optim.summary(results), String)
         @test Optim.converged(results)
         @test Optim.minimum(results) < minval + sqrt(eps(minval))
+
+        # TODO: Add test where we start with an infeasible point
     end
 end

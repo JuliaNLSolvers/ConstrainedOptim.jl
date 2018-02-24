@@ -10,9 +10,10 @@ MVP = OptimTestProblems.MultivariateProblems
 debug_printing = true
 
 my_tests = [
+    "readme.jl",
+    "constraints.jl",
     "counter.jl",
     "ipnewton_unconstrained.jl",
-    "constraints.jl",
 ]
 
 function run_optim_tests(method; convergence_exceptions = (),

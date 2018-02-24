@@ -20,6 +20,10 @@ IPNewton(; linesearch::Function = ConstrainedOptim.backtrack_constrained_grad,
 The initial barrier penalty coefficient `μ0` can be chosen as a number, or set
 to `:auto` to let the algorithm decide its value, see `initialize_μ_λ!`.
 
+*Note*: For constrained optimization problems, we recommend
+always enabling `allow_f_increases` and `successive_f_tol` in the options passed to `optimize`.
+The default is set to `Optim.Options(allow_f_increases = true, successive_f_tol = 2)`.
+
 As of February 2018, the line search algorithm is specialised for constrained
 interior-point methods. In future we hope to support more algorithms from
 `LineSearches.jl`.
