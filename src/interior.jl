@@ -181,9 +181,9 @@ function initial_convergence(d, state, method::ConstrainedOptimizer, initial_x, 
     vecnorm(gradient(d), Inf) + vecnorm(state.bgrad, Inf) < options.g_tol
 end
 
-function optimize(d::AbstractObjective, constraints::AbstractConstraints, initial_x::Tx, method::M,
+function optimize(d::AbstractObjective, constraints::AbstractConstraints, initial_x::Tx, method::ConstrainedOptimizer,
                   options::Options = Options(;default_options(method)...),
-                  state = initial_state(method, options, d, constraints, initial_x)) where {Tx, M<:ConstrainedOptimizer}
+                  state = initial_state(method, options, d, constraints, initial_x)) where Tx
     #== TODO:
     Let's try to unify this with the unconstrained `optimize` in Optim
     The only thing we'd have to deal with is to dispatch

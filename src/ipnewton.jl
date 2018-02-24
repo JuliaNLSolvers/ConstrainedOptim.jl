@@ -126,7 +126,6 @@ function initial_state(method::IPNewton, options, d::TwiceDifferentiable, constr
 
     # More constraints
     constr_J = Array{T}(mc, n)
-    constr_gtemp = Array{T}(n)
     gtilde = similar(g)
     constraints.jacobian!(constr_J, initial_x)
     μ = T(1)
@@ -161,12 +160,12 @@ function initial_state(method::IPNewton, options, d::TwiceDifferentiable, constr
         gtilde,
         0)
 
-    hessian!(d, initial_x)
-    copy!(state.H, hessian(d))
     Hinfo = (state.H, hessianI(initial_x, constraints, 1./bstate.slack_c, 1))
     initialize_μ_λ!(state, constraints.bounds, Hinfo, method.μ0)
     update_fg!(d, constraints, state, method)
     update_h!(d, constraints, state, method)
+
+    state
 end
 
 function update_fg!(d, constraints::TwiceDifferentiableConstraints, state, method::IPNewton)
@@ -205,6 +204,9 @@ function update_h!(d, constraints::TwiceDifferentiableConstraints, state, method
     # accumulate the constraint second derivatives
     λ = userλ(bstate.λc, constraints)
     λ[bounds.eqc] = -bstate.λcE  # the negative sign is from the Hessian
+    # Important! We are assuming that constraints.h! adds the hessian of the
+    # non-objective Lagrangian terms to the existing objective Hessian Hxx.
+    # This follows the approach by the CUTEst interface
     constraints.h!(Hxx, x, λ)
     # Add the Jacobian terms (JI'*Hss*JI)
     JIc = view(J, bounds.ineqc, :)
