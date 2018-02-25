@@ -579,8 +579,8 @@ barrier_value(bounds::ConstraintBounds, state) =
 barrier_value(constraints::AbstractConstraints, state) =
     barrier_value(constraints.bounds, state)
 
-# don't call this barrier_value because it lacks μ
-function _bv(v, idx, σ)
+# don'tcall this barrier_value because it lacks μ
+function _bv(v, idx, σ) # TODO: Not used, delete? (IPNewton)
     ret = loginf(one(eltype(σ))*one(eltype(v)))
     for (i,iv) in enumerate(idx)
         ret += loginf(σ[i]*v[iv])
