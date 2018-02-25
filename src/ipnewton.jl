@@ -70,7 +70,6 @@ type IPNewtonState{T,Tx} <: AbstractBarrierState
     gtilde::Tx
     Htilde
 end
-summary(::IPNewtonState) = "Interior-point Newton's Method"
 
 # TODO: Do we need this convert thing? I don't have any tests to check that it works
 function Base.convert{T,Tx,S,Sx}(::Type{IPNewtonState{T,Tx}}, state::IPNewtonState{S, Sx})
