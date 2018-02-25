@@ -62,6 +62,9 @@
     lc = [0.1^2]
     dfc = TwiceDifferentiableConstraints(con_c!, con_jacobian!, con_h!,
                                          lx, ux, lc, uc)
-    res = optimize(df, dfc, x0, IPNewton())
-    @test Optim.minimum(res) ≈ 0.2966215688829255
+
+    @suppress begin
+        res = optimize(df, dfc, x0, IPNewton())
+        @test Optim.minimum(res) ≈ 0.2966215688829255
+    end
 end
