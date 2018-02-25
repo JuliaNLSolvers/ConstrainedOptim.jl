@@ -103,8 +103,6 @@ line-search algorithm for large-scale nonlinear programming. Mathematical Progra
 
 
 ### Box minimzation
-*Include one-sided and equality constraints (if possible?)*
-
 We want to optimize the Rosenbrock function in the box
 `-0.5 ≤ x ≤ 0.5`, starting from the point `x0=zeros(2)`.
 Box constraints are defined using, for example,
@@ -220,7 +218,7 @@ function con_h!(h, x, λ)
     h[2,2] += λ[1]*2
 end
 ```
-**Note that we add the `λ`-weighted Hessian value of `c(x)` to the Hessian of `fun`.**
+**Note that `con_h!` adds the `λ`-weighted Hessian value of each element of `c(x)` to the Hessian of `fun`.**
 
 
 We can then optimize the Rosenbrock function inside the ball of radius
