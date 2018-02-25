@@ -49,9 +49,9 @@ end
 
 slack(bstate::BarrierStateVars) = [bstate.slack_x; bstate.slack_c]
 lambdaI(bstate::BarrierStateVars) = [bstate.λx; bstate.λc]
-lambdaE(bstate::BarrierStateVars) = [bstate.λxE; bstate.λcE]
+lambdaE(bstate::BarrierStateVars) = [bstate.λxE; bstate.λcE] # TODO: Not used by IPNewton?
 lambdaI(state::AbstractBarrierState) = lambdaI(state.bstate)
-lambdaE(state::AbstractBarrierState) = lambdaE(state.bstate)
+lambdaE(state::AbstractBarrierState) = lambdaE(state.bstate) # TODO: Not used by IPNewton?
 
 Base.similar(bstate::BarrierStateVars) =
     BarrierStateVars(similar(bstate.slack_x),
@@ -455,7 +455,7 @@ userλ(λcI, constraints) = userλ(λcI, constraints.bounds)
 
 ## Computation of the Lagrangian and its gradient
 # This is in a parametrization that is also useful during linesearch
-
+# TODO: `lagrangian` does not seem to be used (IPNewton)?
 function lagrangian(d, bounds::ConstraintBounds, x, c, bstate::BarrierStateVars, μ)
     f_x = NLSolversBase.value!(d, x)
     ev = equality_violation(bounds, x, c, bstate)
@@ -813,6 +813,7 @@ isinterior(constraints::Void, state::AbstractBarrierState) = true
 isinterior(constraints::Void, x) = true
 
 ## Utilities for representing total state as single vector
+# TODO: Most of these seem to be unused (IPNewton)?
 function pack_vec(x, b::BarrierStateVars)
     n = length(x)
     for fn in fieldnames(b)
