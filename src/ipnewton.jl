@@ -20,6 +20,10 @@ IPNewton(; linesearch::Function = ConstrainedOptim.backtrack_constrained_grad,
 The initial barrier penalty coefficient `μ0` can be chosen as a number, or set
 to `:auto` to let the algorithm decide its value, see `initialize_μ_λ!`.
 
+*Note*: For constrained optimization problems, we recommend
+always enabling `allow_f_increases` and `successive_f_tol` in the options passed to `optimize`.
+The default is set to `Optim.Options(allow_f_increases = true, successive_f_tol = 2)`.
+
 As of February 2018, the line search algorithm is specialised for constrained
 interior-point methods. In future we hope to support more algorithms from
 `LineSearches.jl`.
@@ -66,7 +70,6 @@ type IPNewtonState{T,Tx} <: AbstractBarrierState
     gtilde::Tx
     Htilde
 end
-summary(::IPNewtonState) = "Interior-point Newton's Method"
 
 # TODO: Do we need this convert thing? I don't have any tests to check that it works
 function Base.convert{T,Tx,S,Sx}(::Type{IPNewtonState{T,Tx}}, state::IPNewtonState{S, Sx})
@@ -126,7 +129,6 @@ function initial_state(method::IPNewton, options, d::TwiceDifferentiable, constr
 
     # More constraints
     constr_J = Array{T}(mc, n)
-    constr_gtemp = Array{T}(n)
     gtilde = similar(g)
     constraints.jacobian!(constr_J, initial_x)
     μ = T(1)
@@ -161,12 +163,12 @@ function initial_state(method::IPNewton, options, d::TwiceDifferentiable, constr
         gtilde,
         0)
 
-    hessian!(d, initial_x)
-    copy!(state.H, hessian(d))
     Hinfo = (state.H, hessianI(initial_x, constraints, 1./bstate.slack_c, 1))
     initialize_μ_λ!(state, constraints.bounds, Hinfo, method.μ0)
     update_fg!(d, constraints, state, method)
     update_h!(d, constraints, state, method)
+
+    state
 end
 
 function update_fg!(d, constraints::TwiceDifferentiableConstraints, state, method::IPNewton)
@@ -205,6 +207,9 @@ function update_h!(d, constraints::TwiceDifferentiableConstraints, state, method
     # accumulate the constraint second derivatives
     λ = userλ(bstate.λc, constraints)
     λ[bounds.eqc] = -bstate.λcE  # the negative sign is from the Hessian
+    # Important! We are assuming that constraints.h! adds the hessian of the
+    # non-objective Lagrangian terms to the existing objective Hessian Hxx.
+    # This follows the approach by the CUTEst interface
     constraints.h!(Hxx, x, λ)
     # Add the Jacobian terms (JI'*Hss*JI)
     JIc = view(J, bounds.ineqc, :)

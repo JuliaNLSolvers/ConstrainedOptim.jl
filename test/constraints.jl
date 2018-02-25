@@ -526,5 +526,21 @@ using ConstrainedOptim, PositiveFactorizations
         @test isa(Optim.summary(results), String)
         @test Optim.converged(results)
         @test Optim.minimum(results) < minval + sqrt(eps(minval))
+
+        # Test the tracing
+        @suppress_out begin
+            # TODO: Update this when show_linesearch becomes part of Optim.Options
+            method = IPNewton(show_linesearch = true)
+            options = Options(iterations = 2,
+                              show_trace = true, extended_trace=true, store_trace = true;
+                              ConstrainedOptim.default_options(method)...)
+            results = optimize(df,constraints, [12, 14.0], method, options)
+
+            io = IOBuffer()
+            show(io, results.trace)
+            @test startswith(String(take!(io)), "Iter     Lagrangian value Function value   Gradient norm    |==constr.|      μ\n------   ---------------- --------------   --------------   --------------   --------\n")
+        end
+
+        # TODO: Add test where we start with an infeasible point
     end
 end

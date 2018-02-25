@@ -3,16 +3,16 @@
 #
 
 using ConstrainedOptim
-using Base.Test
-using Compat
+using Base.Test, Suppressor
 using OptimTestProblems
 MVP = OptimTestProblems.MultivariateProblems
-debug_printing = true
+debug_printing = false
 
 my_tests = [
+    "readme.jl",
+    "constraints.jl",
     "counter.jl",
     "ipnewton_unconstrained.jl",
-    "constraints.jl",
 ]
 
 function run_optim_tests(method; convergence_exceptions = (),

@@ -49,9 +49,9 @@ end
 
 slack(bstate::BarrierStateVars) = [bstate.slack_x; bstate.slack_c]
 lambdaI(bstate::BarrierStateVars) = [bstate.λx; bstate.λc]
-lambdaE(bstate::BarrierStateVars) = [bstate.λxE; bstate.λcE]
+lambdaE(bstate::BarrierStateVars) = [bstate.λxE; bstate.λcE] # TODO: Not used by IPNewton?
 lambdaI(state::AbstractBarrierState) = lambdaI(state.bstate)
-lambdaE(state::AbstractBarrierState) = lambdaE(state.bstate)
+lambdaE(state::AbstractBarrierState) = lambdaE(state.bstate) # TODO: Not used by IPNewton?
 
 Base.similar(bstate::BarrierStateVars) =
     BarrierStateVars(similar(bstate.slack_x),
@@ -181,9 +181,9 @@ function initial_convergence(d, state, method::ConstrainedOptimizer, initial_x, 
     vecnorm(gradient(d), Inf) + vecnorm(state.bgrad, Inf) < options.g_tol
 end
 
-function optimize(d::AbstractObjective, constraints::AbstractConstraints, initial_x::Tx, method::M,
+function optimize(d::AbstractObjective, constraints::AbstractConstraints, initial_x::Tx, method::ConstrainedOptimizer,
                   options::Options = Options(;default_options(method)...),
-                  state = initial_state(method, options, d, constraints, initial_x)) where {Tx, M<:ConstrainedOptimizer}
+                  state = initial_state(method, options, d, constraints, initial_x)) where Tx
     #== TODO:
     Let's try to unify this with the unconstrained `optimize` in Optim
     The only thing we'd have to deal with is to dispatch
@@ -455,7 +455,7 @@ userλ(λcI, constraints) = userλ(λcI, constraints.bounds)
 
 ## Computation of the Lagrangian and its gradient
 # This is in a parametrization that is also useful during linesearch
-
+# TODO: `lagrangian` does not seem to be used (IPNewton)?
 function lagrangian(d, bounds::ConstraintBounds, x, c, bstate::BarrierStateVars, μ)
     f_x = NLSolversBase.value!(d, x)
     ev = equality_violation(bounds, x, c, bstate)
@@ -579,8 +579,8 @@ barrier_value(bounds::ConstraintBounds, state) =
 barrier_value(constraints::AbstractConstraints, state) =
     barrier_value(constraints.bounds, state)
 
-# don't call this barrier_value because it lacks μ
-function _bv(v, idx, σ)
+# don'tcall this barrier_value because it lacks μ
+function _bv(v, idx, σ) # TODO: Not used, delete? (IPNewton)
     ret = loginf(one(eltype(σ))*one(eltype(v)))
     for (i,iv) in enumerate(idx)
         ret += loginf(σ[i]*v[iv])
@@ -813,6 +813,7 @@ isinterior(constraints::Void, state::AbstractBarrierState) = true
 isinterior(constraints::Void, x) = true
 
 ## Utilities for representing total state as single vector
+# TODO: Most of these seem to be unused (IPNewton)?
 function pack_vec(x, b::BarrierStateVars)
     n = length(x)
     for fn in fieldnames(b)

@@ -1,6 +1,6 @@
 @testset "IPNewton Unconstrained" begin
     method = IPNewton()
-    run_optim_tests(method; show_name=true, show_res=false, show_itcalls=true)
+    run_optim_tests(method; show_name=debug_printing, show_res=false, show_itcalls=debug_printing)
 
     # prob = UP.examples["Rosenbrock"]
     # df = TwiceDifferentiable(UP.objective(prob), UP.gradient(prob),
