@@ -173,7 +173,7 @@ Results of Optimization Algorithm
 An unconstrained problem can be defined either by passing
 `Inf` bounds or empty arrays.
 **Note that we must pass the correct type information to the empty `lx` and `ux`**
-```
+``` julia
 lx = fill(-Inf, 2); ux = fill(Inf, 2)
 dfc = TwiceDifferentiableConstraints(lx, ux)
 
