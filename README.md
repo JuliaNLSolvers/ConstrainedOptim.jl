@@ -252,7 +252,8 @@ Results of Optimization Algorithm
  * Gradient Calls: 109
 ```
 
-We finish the examples by optimizing the objective on the annulus with
+We can add a lower bound on the constraint, and thus
+optimize the objective on the annulus with
 inner and outer radii `0.1` and `0.5` respectively.
 
 ``` julia
@@ -265,3 +266,46 @@ res = optimize(df, dfc, x0, IPNewton())
 interior point.** `IPNewton` can often handle this, however, if the
 initial guess is such that `c(x) = u_c`, then the algorithm currently
 fails. We hope to fix this in the future.
+
+
+#### Multiple constraints
+The following example illustrates how to add an additional constraint.
+In particular, we add a constraint `c_2(x) = x[2]*sin(x[1])-x[1]`.
+
+``` julia
+function con_c!(c, x)
+    c[1] = x[1]^2 + x[2]^2     # First constraint
+    c[2] = x[2]*sin(x[1])-x[1] # Second constraint
+    c
+end
+function con_jacobian!(J, x)
+    # First constraint
+    J[1,1] = 2*x[1]
+    J[1,2] = 2*x[2]
+    # Second constraint
+    J[2,1] = x[2]*cos(x[1])-1.0
+    J[2,2] = sin(x[1])
+    J
+end
+function con_h!(h, x, λ)
+    # First constraint
+    h[1,1] += λ[1]*2
+    h[2,2] += λ[1]*2
+    # Second constraint
+    h[1,1] += λ[2]*x[2]*-sin(x[1])
+    h[1,2] += λ[2]*cos(x[1])
+    # Symmetrize h
+    h[2,1]  = h[1,2]
+    h
+end
+```
+
+We generate the constraint objects and call `IPNewton` with
+initial guess `x0 = [0.25,0.25]`.
+``` julia
+x0 = [0.25, 0.25]
+lc = [-Inf, 0.0]; uc = [0.5^2, 0.0]
+dfc = TwiceDifferentiableConstraints(con_c!, con_jacobian!, con_h!,
+                                     lx, ux, lc, uc)
+res = optimize(df, dfc, x0, IPNewton())
+```
