@@ -1,3 +1,5 @@
+**Note: This functionality is now merged into Optim.jl**
+
 # ConstrainedOptim
 
 [![Build Status](https://travis-ci.org/JuliaNLSolvers/ConstrainedOptim.jl.svg?branch=master)](https://travis-ci.org/JuliaNLSolvers/ConstrainedOptim.jl)
